@@ -1,8 +1,10 @@
+import time
+
+import adafruit_tlc5947
 import board
 import busio
 import digitalio
-import adafruit_tlc5947
-import time
+import json
 
 # Define pins connected to the TLC5947
 SCK = board.SCK
@@ -57,68 +59,85 @@ calib = {
 
 def allplate(int1):
     """switches on the full plate at the corresponding intensity
-    calib[i] refers to the normalization values in a scale 1 to 10 000,
+    calib[i] refers to the normalization values in a scale 1 to 10,000,
     0.3343 is the slope in the int1/actual intensity curve
     and 0.74 is the conversion factor from the sensor size, 0.74cm2 to 1cm2,
     input values for int1 are in uW/cm2, minimum value is 0.7 and maximum
-    value is around 1400"""
+    value is around 1400 (for 4096 bit intensity in the LED, normalized)"""
     for i in range(0, 24):
         led[i] = int(int1 * (calib[i] / 10000) * (1 / 0.3343) * 0.74)
 
 
 """
-Plate dictionary: the pairs are position (0 to 24)
+Plate dictionary: the pairs are position (0 to 23)
 followed by the intensity in uW/cm2, the
-conversion is done in the indiv() function
+conversion is done in the while loop below
+
+The plate values are read from a JSON file with the code below
 """
-plate = {
-    0: 320,
-    1: 320,
-    2: 320,
-    3: 180,
-    4: 180,
-    5: 180,
-    6: 2,
-    7: 2,
-    8: 2,
-    9: 8,
-    10: 8,
-    11: 8,
-    12: 20,
-    13: 20,
-    14: 20,
-    15: 60,
-    16: 60,
-    17: 60,
-    18: 120,
-    19: 120,
-    20: 120,
-    21: 240,
-    22: 240,
-    23: 240,
-}
 
+with open("out_plate.json") as file:
+    plate = json.load(file)
 
-def indiv():
-    """explanation: led[i] activates the corresponding led
-    plate[i] reads the position:intensity from the plate dictionary (above)
-    calib[i] reads the normalization values from the calibration dictionary
-    then it does the normalization (dividing by 10000) and then multiplies by
-    0.3343 and 0.74, the correction factors
-    for example, to have 100 uW/cm2, we send the value 100 to the
-    function, then it divides by 0.3343 and multiplies by 0.74 to get
-    the adjusted 14-bit value to the LED driver. As an example,
-    intensity 1024 gives an output of
+layout = [
+    "0",
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14",
+    "15",
+    "16",
+    "17",
+    "18",
+    "19",
+    "20",
+    "21",
+    "22",
+    "23",
+]
+t = 0
+total_min = 30
+
+while t <= total_min - 1:
     """
-    for i in range(0, 24):
-        led[i] = int(plate[i] * (calib[i] / 10000) * (1 / 0.3343) * 0.74)
+    To keep the plate "alive" for a certain number of minutes, if not the plate will
+    go crazy.
+    total_min is the number of minutes to run the plate
+    t is the "timer"
+
+    Since the data is saved as a json with the index i as a string, we need to convert this
+    to integer, so d=int(i) and we pass d to the function.
+
+    explanation: led[d] activates the corresponding led
+    plate[d] reads the position:intensity from the imported JSON file
+    calib[d] reads the normalization values from the calibration dictionary
+    then it does the normalization (dividing by 10000) and then multiplies by
+    0.3343 and 0.74, the correction factors for the value/intensity slope and
+    for the sensor calibration area.
+    For example, to have 100 uW/cm2, we send the value 100 to the
+    function, does the calibratioin, then it divides by 0.3343 and multiplies by 0.74
+    to get the adjusted 14-bit value to the LED driver. As an example,
+    intensity 1024 gives an output of 360 uW/cm2
+    """
+    for i in layout:
+        d = int(i)
+        led[d] = int(plate[i] * (calib[d] / 10000) * (1 / 0.3343) * 0.74)
+    time.sleep(60)
+    t = t + 1
 
 while True:
     """
-    To keep the plate "alive" we use the time.sleep(5), so it resets the illumination
-    every 5 seconds and doesn't get stuck after a while
+    This part is to keep the plate off every 10 seconds, if not will start again on its own
     """
-    indiv()
-    time.sleep(5)
-
-    
+    allplate(0)
+    time.sleep(10)
