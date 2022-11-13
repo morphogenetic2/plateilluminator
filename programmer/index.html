@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Fluoplate designer</title>
+    <style>
+      /* roboto-regular - latin */
+      @font-face {
+        font-family: "Roboto";
+        font-style: normal;
+        font-weight: 400;
+        src: local(""),
+          url("../fonts/roboto-v30-latin-regular.woff2") format("woff2"),
+          /* Chrome 26+, Opera 23+, Firefox 39+ */
+            url("../fonts/roboto-v30-latin-regular.woff") format("woff"); /* Chrome 6+, Firefox 3.6+, IE 9+, Safari 5.1+ */
+      }
+      :root {
+        font-family: roboto, Arial, Helvetica, sans-serif;
+      }
+      .materialbutton {
+        text-transform: uppercase;
+        font-family: roboto, Arial, Helvetica, sans-serif;
+        font-weight: 500;
+        font-size: 0.9rem;
+        letter-spacing: 0.11rem;
+        border-radius: 3px;
+        padding: 4px;
+        height: 3vh;
+        width: fit-content;
+        border: none;
+      }
+      table {
+        font-size: 20pt;
+      }
+      .bottomforms {
+        width: 6vh;
+        height: 3vh;
+        border: none;
+        background-color: antiquewhite;
+        border-radius: 8px;
+        text-align: center;
+        -moz-appearance: textfield;
+      }
+      .plate {
+        background-color: white;
+        border: 0.5px solid navy;
+        height: 8vh;
+        width: 8vh;
+        border-radius: 8vh;
+        text-align: center;
+        -moz-appearance: textfield;
+
+        font-size: 20pt;
+      }
+      input::-webkit-outer-spin-button,
+      input::-webkit-inner-spin-button {
+        -webkit-appearance: none;
+
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      This is a Fluoplate programmer. Just input your data below, values in
+      &mu;W/cm<sup>2</sup>, max 300
+    </header>
+    <table>
+      <thead>
+        <th></th>
+        <th>1</th>
+        <th>2</th>
+        <th>3</th>
+        <th>4</th>
+        <th>5</th>
+        <th>6</th>
+      </thead>
+      <tr>
+        <td>A</td>
+
+        <td>
+          <input type="number" class="plate" id="0" onchange="updatecolor()" />
+        </td>
+        <td>
+          <input type="number" class="plate" id="1" onchange="updatecolor()" />
+        </td>
+        <td>
+          <input type="number" class="plate" id="2" onchange="updatecolor()" />
+        </td>
+        <td>
+          <input type="number" class="plate" id="3" onchange="updatecolor()" />
+        </td>
+        <td>
+          <input type="number" class="plate" id="4" onchange="updatecolor()" />
+        </td>
+        <td>
+          <input type="number" class="plate" id="5" onchange="updatecolor()" />
+        </td>
+      </tr>
+      <tr>
+        <td>B</td>
+
+        <td>
+          <input type="number" class="plate" id="6" onchange="updatecolor()" />
+        </td>
+        <td>
+          <input type="number" class="plate" id="7" onchange="updatecolor()" />
+        </td>
+        <td>
+          <input type="number" class="plate" id="8" onchange="updatecolor()" />
+        </td>
+        <td>
+          <input type="number" class="plate" id="9" onchange="updatecolor()" />
+        </td>
+        <td>
+          <input type="number" class="plate" id="10" onchange="updatecolor()" />
+        </td>
+        <td>
+          <input type="number" class="plate" id="11" onchange="updatecolor()" />
+        </td>
+      </tr>
+      <tr>
+        <td>C</td>
+
+        <td>
+          <input type="number" class="plate" id="12" onchange="updatecolor()" />
+        </td>
+        <td>
+          <input type="number" class="plate" id="13" onchange="updatecolor()" />
+        </td>
+        <td>
+          <input type="number" class="plate" id="14" onchange="updatecolor()" />
+        </td>
+        <td>
+          <input type="number" class="plate" id="15" onchange="updatecolor()" />
+        </td>
+        <td>
+          <input type="number" class="plate" id="16" onchange="updatecolor()" />
+        </td>
+        <td>
+          <input type="number" class="plate" id="17" onchange="updatecolor()" />
+        </td>
+      </tr>
+      <tr>
+        <td>D</td>
+
+        <td>
+          <input type="number" class="plate" id="18" onchange="updatecolor()" />
+        </td>
+        <td>
+          <input type="number" class="plate" id="19" onchange="updatecolor()" />
+        </td>
+        <td>
+          <input type="number" class="plate" id="20" onchange="updatecolor()" />
+        </td>
+        <td>
+          <input type="number" class="plate" id="21" onchange="updatecolor()" />
+        </td>
+        <td>
+          <input type="number" class="plate" id="22" onchange="updatecolor()" />
+        </td>
+        <td>
+          <input type="number" class="plate" id="23" onchange="updatecolor()" />
+        </td>
+      </tr>
+    </table>
+    <p>
+      Constant fill:
+      <input type="number" id="fillconstant" class="bottomforms" />
+      <button class="materialbutton" onclick="fillconstant();updatecolor()">
+        Fill
+      </button>
+    </p>
+    <p>
+      Gradient fill: from
+      <input
+        type="number"
+        oninput="setgradient()"
+        id="gstart"
+        class="bottomforms"
+      />
+      to
+      <input
+        type="number"
+        id="gend"
+        class="bottomforms"
+        oninput="setgradient()"
+      />
+      with increment
+      <input type="number" id="ginc" class="bottomforms" />
+
+      <button
+        class="materialbutton"
+        id="automatic"
+        onclick="fillgradient();updatecolor()"
+      >
+        Fill plate
+      </button>
+    </p>
+
+    <p>
+      Timing: active (s)
+      <input type="number" id="active-time" class="bottomforms" value="30" />
+      inactive (s)
+      <input type="number" id="inactive-time" class="bottomforms" value="30" />
+    </p>
+    <p>
+      Total run time (min)
+      <input type="number" id="total-time" class="bottomforms" value="180" />
+    </p>
+
+    <p>
+      <button
+        class="materialbutton"
+        id="clearbtn"
+        onclick="clearbtn();updatecolor()"
+      >
+        Clear plate
+      </button>
+
+      <button class="materialbutton" id="download" onclick="createJSON()">
+        Download JSON
+      </button>
+    </p>
+    <p id="output"></p>
+
+    <script>
+      //initialize the object that will be converted to JSON later
+      const plate = {};
+
+      function clearbtn() {
+        for (i = 0; i < 24; i++) {
+          document.getElementById(i).value = "";
+        }
+      }
+      function fillconstant() {
+        let fillconstant = document.getElementById("fillconstant").value;
+        for (i = 0; i < 24; i++) {
+          document.getElementById(i).value = fillconstant;
+        }
+      }
+      function fillgradient() {
+        if (
+          document.getElementById("ginc").value == null ||
+          document.getElementById("ginc").value == ""
+        ) {
+          setgradient();
+        } else {
+          let gstart = document.getElementById("gstart").value;
+          let gend = document.getElementById("gend").value;
+          let ginc = document.getElementById("ginc").value;
+
+          for (i = 0; i < 24; i++) {
+            let cellvalue = +gstart + +i * +ginc;
+            document.getElementById(i).value = cellvalue;
+          }
+        }
+      }
+      function setgradient() {
+        let gstart = document.querySelector("#gstart").value;
+        let gend = document.querySelector("#gend").value;
+        let increment = (gend - gstart) / 24;
+        document.querySelector("#ginc").value = Math.ceil(increment);
+      }
+
+      function createJSON() {
+        for (i = 0; i < 24; i++) {
+          plate[i] = Number(document.getElementById(i).value);
+        }
+        plate.active = +document.getElementById("active-time").value;
+        plate.inactive = +document.getElementById("inactive-time").value;
+        plate["total-time"] = +document.getElementById("total-time").value;
+        //let salida = (document.querySelector("#output").innerHTML =JSON.stringify(plate));
+
+        var jsonData =
+          "text/json;charset=utf-8," +
+          encodeURIComponent(JSON.stringify(plate));
+
+        var a = document.createElement("a");
+        a.href = "data:" + jsonData;
+        a.download = "out_plate.json";
+        a.innerHTML = "Download JSON";
+
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+      function download() {
+        createJSON();
+        var a = document.createElement("a");
+        a.href = "data:" + data;
+        a.download = "data.json";
+        a.innerHTML = "download";
+
+        var container = document.querySelector("#download");
+        container.appendChild(a);
+      }
+      function updatecolor() {
+        for (i = 0; i < 24; i++) {
+          let intensity = +document.getElementById(i).value;
+          let newcolor = "rgb(0,0,255," + intensity / 300 + ")";
+          document.getElementById(i).style.background = newcolor;
+        }
+      }
+    </script>
+  </body>
+</html>
