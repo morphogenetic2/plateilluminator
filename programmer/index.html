@@ -5,6 +5,12 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Fluoplate designer</title>
+    <!-- Compiled and minified CSS -->
+    <!--link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.css"
+    /-->
+
     <style>
       /* roboto-regular - latin */
       @font-face {
@@ -19,30 +25,53 @@
       :root {
         font-family: roboto, Arial, Helvetica, sans-serif;
       }
-      .materialbutton {
-        text-transform: uppercase;
-        font-family: roboto, Arial, Helvetica, sans-serif;
-        font-weight: 500;
-        font-size: 0.9rem;
-        letter-spacing: 0.11rem;
-        border-radius: 3px;
-        padding: 4px;
-        height: 3vh;
-        width: fit-content;
+
+      .button {
+        text-decoration: none;
+        color: #fff;
+        background-color: #3a51fc;
+        text-align: center;
+        letter-spacing: 0.7px;
         border: none;
+        border-radius: 2px;
+        display: inline-block;
+        height: 36px;
+        line-height: 36px;
+        padding: 0 16px;
+        text-transform: uppercase;
+        box-shadow: 0 2px 2px 0 rgba(0, 0, 0, 0.14),
+          0 3px 1px -2px rgba(0, 0, 0, 0.12), 0 1px 5px 0 rgba(0, 0, 0, 0.2);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+        font-weight: normal;
+        font-size: 16px;
       }
+      .button:hover {
+        background-color: #6f9dff;
+        box-shadow: 0 3px 3px 0 rgba(0, 0, 0, 0.14),
+          0 1px 7px 0 rgba(0, 0, 0, 0.12), 0 3px 1px -1px rgba(0, 0, 0, 0.2);
+      }
+
       table {
         font-size: 20pt;
       }
-      .bottomforms {
-        width: 6vh;
-        height: 3vh;
+      .inputtext {
+        background-color: transparent;
         border: none;
-        background-color: antiquewhite;
-        border-radius: 8px;
+        border-bottom: #bdbdbd solid 1px;
+        appearance: textfield;
+        height: 2rem;
+        font-size: 16px;
+        width: 4rem;
         text-align: center;
-        -moz-appearance: textfield;
+        outline: none;
       }
+      .inputtext:focus {
+        background-color: #cfdefd;
+        border-radius: 2px;
+        border-bottom: #3a51fc solid 2px;
+      }
+
       .plate {
         background-color: white;
         border: 0.5px solid navy;
@@ -50,23 +79,18 @@
         width: 8vh;
         border-radius: 8vh;
         text-align: center;
-        -moz-appearance: textfield;
-
+        appearance: textfield;
         font-size: 20pt;
-      }
-      input::-webkit-outer-spin-button,
-      input::-webkit-inner-spin-button {
-        -webkit-appearance: none;
-
-        margin: 0;
+        outline: none;
       }
     </style>
   </head>
   <body>
     <header>
       This is a Fluoplate programmer. Just input your data below, values in
-      &mu;W/cm<sup>2</sup>, max 300
+      &mu;W/cm<sup>2</sup>, max 300 per well
     </header>
+
     <table>
       <thead>
         <th></th>
@@ -166,10 +190,16 @@
         </td>
       </tr>
     </table>
+
     <p>
       Constant fill:
-      <input type="number" id="fillconstant" class="bottomforms" />
-      <button class="materialbutton" onclick="fillconstant();updatecolor()">
+      <input
+        type="number"
+        id="fillconstant"
+        class="inputtext"
+        onclick="this.select()"
+      />
+      <button class="button" onclick="fillconstant(); updatecolor()">
         Fill
       </button>
     </p>
@@ -178,23 +208,30 @@
       <input
         type="number"
         oninput="setgradient()"
+        onclick="this.select()"
         id="gstart"
-        class="bottomforms"
+        class="inputtext"
       />
       to
       <input
         type="number"
         id="gend"
-        class="bottomforms"
+        class="inputtext"
         oninput="setgradient()"
+        onclick="this.select()"
       />
       with increment
-      <input type="number" id="ginc" class="bottomforms" />
+      <input
+        type="number"
+        id="ginc"
+        class="inputtext"
+        onclick="this.select()"
+      />
 
       <button
-        class="materialbutton"
+        class="button"
         id="automatic"
-        onclick="fillgradient();updatecolor()"
+        onclick="fillgradient();updatecolor();"
       >
         Fill plate
       </button>
@@ -202,45 +239,65 @@
 
     <p>
       Timing: active (s)
-      <input type="number" id="active-time" class="bottomforms" value="30" />
+      <input
+        type="number"
+        id="active-time"
+        class="inputtext"
+        value="30"
+        onclick="this.select()"
+      />
       inactive (s)
-      <input type="number" id="inactive-time" class="bottomforms" value="30" />
+      <input
+        type="number"
+        id="inactive-time"
+        class="inputtext"
+        value="30"
+        onclick="this.select()"
+      />
     </p>
     <p>
       Total run time (min)
-      <input type="number" id="total-time" class="bottomforms" value="180" />
+      <input
+        type="number"
+        id="total-time"
+        class="inputtext"
+        value="180"
+        onclick="this.select()"
+      />
     </p>
 
     <p>
-      <button
-        class="materialbutton"
-        id="clearbtn"
-        onclick="clearbtn();updatecolor()"
-      >
+      <button class="button" id="clearbtn" onclick="clearbtn();updatecolor()">
         Clear plate
       </button>
 
-      <button class="materialbutton" id="download" onclick="createJSON()">
-        Download JSON
+      <button class="button" id="download" onclick="createJSON()">
+        Download
+      </button>
+      <button class="button" id="load" onclick="loadJSON()">
+        Load previous plate
       </button>
     </p>
-    <p id="output"></p>
 
     <script>
       //initialize the object that will be converted to JSON later
       const plate = {};
-
+      //function to clear the plate
       function clearbtn() {
         for (i = 0; i < 24; i++) {
           document.getElementById(i).value = "";
         }
       }
+
+      //function to fill the plate with the same constant value
       function fillconstant() {
         let fillconstant = document.getElementById("fillconstant").value;
         for (i = 0; i < 24; i++) {
           document.getElementById(i).value = fillconstant;
         }
       }
+
+      //function to fill the plate with the gradient specified
       function fillgradient() {
         if (
           document.getElementById("ginc").value == null ||
@@ -258,6 +315,8 @@
           }
         }
       }
+
+      //function that sets the gradient step according to the gstart and gend inputs
       function setgradient() {
         let gstart = document.querySelector("#gstart").value;
         let gend = document.querySelector("#gend").value;
@@ -265,6 +324,11 @@
         document.querySelector("#ginc").value = Math.ceil(increment);
       }
 
+      /*this function reads the values of the table and appends them to the plate object, and then
+      adds the active-time, inactive-time and total-time to the JSON, then creates a file and a temporarily hidden
+      link, clicks it automatically and downloads the file
+
+      */
       function createJSON() {
         for (i = 0; i < 24; i++) {
           plate[i] = Number(document.getElementById(i).value);
@@ -287,6 +351,16 @@
         a.click();
         document.body.removeChild(a);
       }
+
+      //this function updates the background color of the table according to its value
+      function updatecolor() {
+        for (i = 0; i < 24; i++) {
+          let range = 500;
+          let intensity = +document.getElementById(i).value;
+          let newcolor = "rgb(0,0,255," + intensity / range + ")";
+          document.getElementById(i).style.background = newcolor;
+        }
+      }
       function download() {
         createJSON();
         var a = document.createElement("a");
@@ -297,13 +371,8 @@
         var container = document.querySelector("#download");
         container.appendChild(a);
       }
-      function updatecolor() {
-        for (i = 0; i < 24; i++) {
-          let intensity = +document.getElementById(i).value;
-          let newcolor = "rgb(0,0,255," + intensity / 300 + ")";
-          document.getElementById(i).style.background = newcolor;
-        }
-      }
+
+      function loadJSON() {}
     </script>
   </body>
 </html>
