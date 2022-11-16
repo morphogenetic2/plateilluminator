@@ -30,36 +30,34 @@ column = [
 ]
 
 # calibration dictionary, the normalization needs to be divided by 10000 and multiplied by the intended intensity value
-calib_white = {
-    0: 0.8534,
-    1: 0.8391,
-    2: 0.8992,
-    3: 0.8465,
-    4: 0.8491,
-    5: 0.9214,
-    6: 1.0000,
-    7: 0.9603,
-    8: 0.9167,
-    9: 0.9050,
-    10: 0.9005,
-    11: 0.8930,
-    12: 0.9453,
-    13: 0.9203,
-    14: 0.8780,
-    15: 0.8512,
-    16: 0.8784,
-    17: 0.8751,
-    18: 0.9058,
-    19: 0.8673,
-    20: 0.8210,
-    21: 0.8628,
-    22: 0.9637,
-    23: 0.9264,
+calib = {
+    0: 8926,
+    1: 7254,
+    2: 7871,
+    3: 9147,
+    4: 9040,
+    5: 10000,
+    6: 7834,
+    7: 7480,
+    8: 9296,
+    9: 7871,
+    10: 8580,
+    11: 8743,
+    12: 8802,
+    13: 7614,
+    14: 7710,
+    15: 8320,
+    16: 8473,
+    17: 8264,
+    18: 7996,
+    19: 7948,
+    20: 7683,
+    21: 8694,
+    22: 7500,
+    23: 9709,
 }
 
 
-#slope for blue leds is 0.3343
-#
 def allplate(int1):
     """
     switches on the full plate at the corresponding intensity
@@ -70,7 +68,7 @@ def allplate(int1):
     value is around 1400 (for 4096 bit intensity in the LED, normalized)
     """
     for i in range(0, 24):
-        led[i] = int(int1 * (calib_white[i]) * ((1 / 0.48) + 0.8))
+        led[i] = int(int1 * (calib[i] / 10000) * (1 / 0.3343) * 0.74)
 
 
 """
@@ -117,7 +115,7 @@ def activate(plate):
     """
 
     for i in range(0, 24):
-        led[i] = int(plate[str(i)] * (calib_white[i]) * (1 / 0.441))
+        led[i] = int(plate[str(i)] * (calib[i] / 10000) * (1 / 0.3343) * 0.74)
 
 
 while t < total_min:

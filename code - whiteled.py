@@ -70,7 +70,7 @@ def allplate(int1):
     value is around 1400 (for 4096 bit intensity in the LED, normalized)
     """
     for i in range(0, 24):
-        led[i] = int(int1 * (calib_white[i]) * ((1 / 0.48) + 0.8))
+        led[i] = int(int1 * (calib_white[i]) * (1 / 0.5763))
 
 
 """
@@ -117,9 +117,10 @@ def activate(plate):
     """
 
     for i in range(0, 24):
-        led[i] = int(plate[str(i)] * (calib_white[i]) * (1 / 0.441))
+        led[i] = int(plate[str(i)] * (calib_white[i]) * (1 / 0.3343) * 0.74)
 
 
+'''
 while t < total_min:
 
     activate(plate)  #activate with the JSON values
@@ -136,3 +137,6 @@ while True:
     """
     allplate(0)
     time.sleep(60)
+'''
+
+activate(plate)
