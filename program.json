@@ -1,0 +1,14 @@
+{
+  "LED1": [
+    { "action": "ON", "duration_ms": 100, "intensity_uwcm2": 1000 },
+    { "action": "OFF", "duration_ms": 500 },
+    { "action": "RAMP", "duration_ms": 1000, "start_intensity_uwcm2": 200, "end_intensity_uwcm2": 1000 },
+    { "action": "ON", "duration_ms": 500, "intensity_uwcm2": 500 },
+    { "action": "RAMP", "duration_ms": 2000, "start_intensity_uwcm2": 1000, "end_intensity_uwcm2": 100 }
+  ],
+  "LED2": [
+    { "action": "ON", "duration_ms": 200, "intensity_uwcm2": 800 },
+    { "action": "RAMP", "duration_ms": 1000, "start_intensity_uwcm2": 800, "end_intensity_uwcm2": 200 },
+    { "action": "OFF", "duration_ms": 300 }
+  ]
+}
