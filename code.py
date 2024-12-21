@@ -55,13 +55,11 @@ calib_white = {
 
 def uw_cm2_to_pwm(uw_cm2, led_index):
     """
-    Convert from µW/cm² to 12-bit PWM using calibration.
-    Then clamp to [0..4095].
+    Convert intensity in µW/cm² to 12-bit PWM using calibration factors.
     """
-    calib_factor = calib_white.get(led_index, 1.0)
-    raw = uw_cm2 * calib_factor * 2.8833333
-    pwm_val_12bit = int(raw)
-    return min(max(pwm_val_12bit, 0), 4095)
+    calib_factor = calib_white.get(led_index, 1.0)  # Default to 1.0 if not in calibration
+    pwm_value = int(uw_cm2 * calib_factor * 2.8833333)
+    return max(0, min(4095, pwm_value))  # Clamp to 12-bit range
 
 
 # -------------------------------
