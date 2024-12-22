@@ -8,12 +8,6 @@ import digitalio
 import adafruit_tlc5947
 
 # -----------------------
-# Constants
-# -----------------------
-NUM_CHANNELS = 24  # Number of TLC5947 channels (24 LEDs)
-TICK_MS = 10  # 10 ms update period
-
-# -----------------------
 # Hardware and TLC5947 Setup
 # -----------------------
 SCK = board.SCK
@@ -25,23 +19,26 @@ LATCH_PIN.direction = digitalio.Direction.OUTPUT
 spi = busio.SPI(clock=SCK, MOSI=MOSI)
 tlc = adafruit_tlc5947.TLC5947(spi, LATCH_PIN)
 
+NUM_CHANNELS = 24  # Number of TLC5947 channels (24 LEDs)
+
 # -----------------------
-# Load Calibration Data
+# Calibration Data
 # -----------------------
-try:
-    with open("/calibration.json", "r") as f:
-        calib_white = json.load(f)
-except OSError:
-    print("No calibration.json found. Defaulting to calibration factors of 1.0 for all LEDs.")
-    calib_white = {str(i): 1.0 for i in range(NUM_CHANNELS)}  # Default to 1.0 for all LEDs
+calib_white = {
+    0: 0.8534, 1: 0.8391, 2: 0.8992, 3: 0.8465, 4: 0.8491, 5: 0.9214,
+    6: 1.0000, 7: 0.9603, 8: 0.9167, 9: 0.9050, 10: 0.9005, 11: 0.8930,
+    12: 0.9453, 13: 0.9203, 14: 0.8780, 15: 0.8512, 16: 0.8784, 17: 0.8751,
+    18: 0.9058, 19: 0.8673, 20: 0.8210, 21: 0.8628, 22: 0.9637, 23: 0.9264,
+}
 
 def uw_cm2_to_pwm(uw_cm2, led_index):
     """
     Convert intensity in µW/cm² to 12-bit PWM using calibration factors.
     """
-    calib_factor = calib_white.get(str(led_index), 1.0)  # Default to 1.0 if not in calibration
+    calib_factor = calib_white.get(led_index, 1.0)  # Default to 1.0 if not in calibration
     pwm_value = int(uw_cm2 * calib_factor * 2.8833333)
     return max(0, min(4095, pwm_value))  # Clamp to 12-bit range
+
 
 # -----------------------
 # LED Program and Control
@@ -106,9 +103,11 @@ class LEDProgram:
         
         return self.current_intensity
 
+
 # -----------------------
 # Load Program Data
 # -----------------------
+program_data = {}
 try:
     with open("/program.json", "r") as f:
         program_data = json.load(f)
@@ -116,15 +115,19 @@ except OSError:
     print("No program.json found. Defaulting to all LEDs OFF.")
     program_data = {}
 
-# Create LED programs using list comprehension
-led_programs = [LEDProgram(program_data.get(f"LED{i}", []), i) for i in range(NUM_CHANNELS)]
+# Create LED programs
+led_programs = []
+for i in range(NUM_CHANNELS):
+    steps = program_data.get(f"LED{i}", [])
+    led_programs.append(LEDProgram(steps, i))
 
 # -----------------------
 # Main Control Loop
 # -----------------------
-print("Starting LED control loop...")
-
+TICK_MS = 10  # 10 ms update period
 last_time = time.monotonic() * 1000
+
+print("Starting LED control loop...")
 
 while True:
     now = time.monotonic() * 1000
