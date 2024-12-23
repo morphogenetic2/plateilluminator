@@ -2,163 +2,289 @@
     "LED0": [
         {
             "type": "ON",
-            "int": 100,
-            "int0": 0,
-            "int1": 0,
-            "duration_ms": 1000,
-            "freq": 0
+            "duration_ms": 50,
+            "int": 1000
+        },
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
         }
     ],
     "LED1": [
         {
             "type": "ON",
-            "int": 100,
-            "int0": 0,
-            "int1": 0,
-            "duration_ms": 1000,
-            "freq": 0
+            "duration_ms": 50,
+            "int": 1000
+        },
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
         }
     ],
     "LED2": [
         {
             "type": "ON",
-            "int": 100,
-            "int0": 0,
-            "int1": 0,
-            "duration_ms": 1000,
-            "freq": 0
+            "duration_ms": 50,
+            "int": 1000
+        },
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
         }
     ],
     "LED3": [
         {
             "type": "ON",
-            "int": 100,
-            "int0": 0,
-            "int1": 0,
-            "duration_ms": 1000,
-            "freq": 0
+            "duration_ms": 50,
+            "int": 1000
+        },
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
         }
     ],
     "LED4": [
         {
             "type": "ON",
-            "int": 100,
-            "int0": 0,
-            "int1": 0,
-            "duration_ms": 1000,
-            "freq": 0
+            "duration_ms": 50,
+            "int": 1000
+        },
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
         }
     ],
     "LED5": [
         {
             "type": "ON",
-            "int": 100,
-            "int0": 0,
-            "int1": 0,
-            "duration_ms": 1000,
-            "freq": 0
+            "duration_ms": 50,
+            "int": 1000
+        },
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
         }
     ],
     "LED6": [
         {
             "type": "ON",
-            "int": 100,
-            "int0": 0,
-            "int1": 0,
-            "duration_ms": 1000,
-            "freq": 0
+            "duration_ms": 50,
+            "int": 1000
+        },
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
+        }
+    ],
+    "LED7": [
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 1000
+        },
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
+        }
+    ],
+    "LED8": [
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 1000
+        },
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
+        }
+    ],
+    "LED9": [
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 1000
+        },
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
+        }
+    ],
+    "LED10": [
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 1000
+        },
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
+        }
+    ],
+    "LED11": [
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 1000
+        },
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
         }
     ],
     "LED12": [
         {
             "type": "ON",
-            "int": 100,
-            "int0": 0,
-            "int1": 0,
-            "duration_ms": 1000,
-            "freq": 0
+            "duration_ms": 50,
+            "int": 1000
+        },
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
+        }
+    ],
+    "LED13": [
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 1000
+        },
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
+        }
+    ],
+    "LED14": [
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 1000
+        },
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
+        }
+    ],
+    "LED15": [
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 1000
+        },
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
+        }
+    ],
+    "LED16": [
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 1000
+        },
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
+        }
+    ],
+    "LED17": [
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 1000
+        },
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
         }
     ],
     "LED18": [
         {
             "type": "ON",
-            "int": 100,
-            "int0": 0,
-            "int1": 0,
-            "duration_ms": 1000,
-            "freq": 0
-        }
-    ],
-    "LED23": [
-        {
-            "type": "RAMP",
-            "int": 100,
-            "int0": 0,
-            "int1": 1000,
-            "duration_ms": 1000,
-            "freq": 0
+            "duration_ms": 50,
+            "int": 1000
         },
         {
-            "type": "RAMP",
-            "int": 100,
-            "int0": 1000,
-            "int1": 0,
-            "duration_ms": 1000,
-            "freq": 0
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
+        }
+    ],
+    "LED19": [
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 1000
+        },
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
         }
     ],
     "LED20": [
         {
-            "type": "RAMP",
-            "int": 100,
-            "int0": 0,
-            "int1": 1000,
-            "duration_ms": 1000,
-            "freq": 0
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 1000
         },
         {
-            "type": "RAMP",
-            "int": 100,
-            "int0": 1000,
-            "int1": 0,
-            "duration_ms": 1000,
-            "freq": 0
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
         }
     ],
     "LED21": [
         {
-            "type": "RAMP",
-            "int": 100,
-            "int0": 0,
-            "int1": 1000,
-            "duration_ms": 1000,
-            "freq": 0
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 1000
         },
         {
-            "type": "RAMP",
-            "int": 100,
-            "int0": 1000,
-            "int1": 0,
-            "duration_ms": 1000,
-            "freq": 0
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
         }
     ],
     "LED22": [
         {
-            "type": "RAMP",
-            "int": 100,
-            "int0": 0,
-            "int1": 1000,
-            "duration_ms": 1000,
-            "freq": 0
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 1000
         },
         {
-            "type": "RAMP",
-            "int": 100,
-            "int0": 1000,
-            "int1": 0,
-            "duration_ms": 1000,
-            "freq": 0
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
+        }
+    ],
+    "LED23": [
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 1000
+        },
+        {
+            "type": "ON",
+            "duration_ms": 50,
+            "int": 0
         }
     ]
 }

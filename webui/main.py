@@ -1,11 +1,21 @@
 import sys
+
 import json
-from PySide6.QtWidgets import QApplication, QDialog, QTableWidgetItem, QMessageBox, QFileDialog
+
+from PySide6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QTableWidgetItem,
+    QMessageBox,
+    QFileDialog,
+)
+
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QStandardItemModel, QStandardItem
 
 # Import the generated UI
 from ui_programmer import Ui_Dialog
+
 
 class ProgrammerDialog(QDialog):
     def __init__(self):
@@ -47,8 +57,9 @@ class ProgrammerDialog(QDialog):
         else:
             self.selected_leds.add(led_index)
             button = getattr(self.ui, f"well{led_index:02d}")
-            button.setStyleSheet("background-color: lightblue;")  # Highlight selected LED
-
+            button.setStyleSheet(
+                "background-color: lightblue;"
+            )  # Highlight selected LED
         self.update_table()
 
     def toggle_all_leds(self):
@@ -74,14 +85,13 @@ class ProgrammerDialog(QDialog):
         int1 = self.ui.int1.value()
         duration = self.ui.duration_ms.value()
         freq = self.ui.freq_Hz.value()
-
         step = {
             "type": step_type,
             "int": intensity,
             "int0": int0,
             "int1": int1,
             "duration_ms": duration,
-            "freq": freq
+            "freq": freq,
         }
 
         for led in self.selected_leds:
@@ -89,7 +99,6 @@ class ProgrammerDialog(QDialog):
             if led_key not in self.led_steps:
                 self.led_steps[led_key] = []
             self.led_steps[led_key].append(step)
-
         self.update_table()
 
     def remove_step(self):
@@ -98,7 +107,6 @@ class ProgrammerDialog(QDialog):
             led_key = f"LED{led - 1}"  # Convert LED index to "LED0", "LED1", etc.
             if led_key in self.led_steps and self.led_steps[led_key]:
                 self.led_steps[led_key].pop()
-
         self.update_table()
 
     def update_step_fields(self):
@@ -109,7 +117,6 @@ class ProgrammerDialog(QDialog):
             self.ui.int1.hide()
             self.ui.freq_Hz.hide()
             self.ui.int_2.show()  # Show intensity for ON
-            self.ui.int_2.setEnabled(True)  # Ensure intensity is enabled for ON
         elif step_type == "OFF":
             self.ui.int0.hide()
             self.ui.int1.hide()
@@ -138,25 +145,70 @@ class ProgrammerDialog(QDialog):
             led_key = f"LED{led - 1}"  # Convert LED index to "LED0", "LED1", etc.
             if led_key in self.led_steps:
                 for step in self.led_steps[led_key]:
-                    self.model.appendRow([
-                        QStandardItem(led_key),
-                        QStandardItem(step["type"]),
-                        QStandardItem(str(step["int"])),
-                        QStandardItem(str(step["duration_ms"]))
-                    ])
+
+                    self.model.appendRow(
+                        [
+                            QStandardItem(led_key),
+                            QStandardItem(step["type"]),
+                            QStandardItem(str(step["int"])),
+                            QStandardItem(str(step["duration_ms"])),
+                        ]
+                    )
 
     def save_program(self):
         """Save the program data to a JSON file using a modal dialog."""
         # Open a modal dialog to select the folder
-        folder_path = QFileDialog.getExistingDirectory(self, "Select Folder to Save Program")
+        folder_path = QFileDialog.getExistingDirectory(
+            self, "Select Folder to Save Program"
+        )
 
         if folder_path:  # If the user selected a folder
             file_path = f"{folder_path}/program.json"
+
+            # Prepare the data to be exported
+            export_data = {}
+            for led_key, steps in self.led_steps.items():
+                export_steps = []
+                for step in steps:
+                    step_type = step["type"]
+                    if step_type == "ON":
+                        export_step = {
+                            "type": step_type,
+                            "duration_ms": step["duration_ms"],
+                            "int": step["int"],
+                        }
+                    elif step_type == "OFF":
+                        export_step = {"type": step_type,
+                                       "duration_ms": step["duration_ms"]}
+                    elif step_type == "RAMP":
+                        export_step = {
+                            "type": step_type,
+                            "int0": step["int0"],
+                            "int1": step["int1"],
+                            "duration_ms": step["duration_ms"],
+                        }
+                    elif step_type == "SINE":
+                        export_step = {
+                            "type": step_type,
+                            "int0": step["int0"],
+                            "int1": step["int1"],
+                            "duration_ms": step["duration_ms"],
+                            "freq": step["freq"],
+                        }
+                    export_steps.append(export_step)
+                export_data[led_key] = export_steps
+
+            # Write the filtered data to the JSON file
             with open(file_path, "w") as f:
-                json.dump(self.led_steps, f, indent=4)
-            QMessageBox.information(self, "Save Program", f"Program saved successfully to {file_path}!")
+                json.dump(export_data, f, indent=4)
+
+            QMessageBox.information(
+                self, "Save Program", f"Program saved successfully to {file_path}!"
+            )
         else:
-            QMessageBox.warning(self, "Save Program", "No folder selected. Program not saved.")
+            QMessageBox.warning(
+                self, "Save Program", "No folder selected. Program not saved."
+            )
 
     def load_program(self):
         """Load the program data from a JSON file."""
@@ -165,10 +217,17 @@ class ProgrammerDialog(QDialog):
                 self.led_steps = json.load(f)
 
             # Update the selected LEDs to include all LEDs with steps
-            self.selected_leds = {int(led.replace("LED", "")) + 1 for led in self.led_steps.keys()}
+
+            self.selected_leds = {
+                int(led.replace("LED", "")) + 1 for led in self.led_steps.keys()
+            }
 
             self.update_table()
-            QMessageBox.information(self, "Load Program", "Program loaded successfully!")
+
+            QMessageBox.information(
+                self, "Load Program", "Program loaded successfully!"
+            )
+
         except FileNotFoundError:
             QMessageBox.warning(self, "Load Program", "No program.json file found.")
 
@@ -181,6 +240,7 @@ class ProgrammerDialog(QDialog):
             button.setStyleSheet("")
         self.update_table()
         QMessageBox.information(self, "Clear Programs", "All programs cleared.")
+
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

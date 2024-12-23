@@ -11,7 +11,8 @@ import adafruit_tlc5947
 # Constants
 # -----------------------
 NUM_CHANNELS = 24  # Number of TLC5947 channels (24 LEDs)
-TICK_MS = 10  # 10 ms update period
+TICK_MS = 50  # 50 ms update period. The whole plate takes 42 ms to update, so the tick needs to be larger than 42 ms. 50 ms is the minimum time that will keep accuracy in the programs.
+SLEEP = 0.001 # time sleep in seconds to avoid CPU overload.
 
 # -----------------------
 # Hardware and TLC5947 Setup
@@ -23,25 +24,25 @@ LATCH_PIN.direction = digitalio.Direction.OUTPUT
 
 # Create SPI bus and TLC5947 object
 spi = busio.SPI(clock=SCK, MOSI=MOSI)
-tlc = adafruit_tlc5947.TLC5947(spi, LATCH_PIN)
+led = adafruit_tlc5947.TLC5947(spi, LATCH_PIN)
 
 # -----------------------
 # Load Calibration Data
 # -----------------------
 try:
     with open("/calibration.json", "r") as f:
-        calib_white = json.load(f)
+        calibration = json.load(f)
 except OSError:
     print("No calibration.json found. Defaulting to calibration factors of 1.0 for all LEDs.")
-    calib_white = {str(i): 1.0 for i in range(NUM_CHANNELS)}  # Default to 1.0 for all LEDs
+    calibration = {str(i): 1.0 for i in range(NUM_CHANNELS)}  # Default to 1.0 for all LEDs
 
-def uw_cm2_to_pwm(uw_cm2, led_index):
+def uw_cm2_to_pwm(led_uwcm2, led_index):
     """
     Convert intensity in µW/cm² to 12-bit PWM using calibration factors.
     """
-    calib_factor = calib_white.get(str(led_index), 1.0)  # Default to 1.0 if not in calibration
-    pwm_value = int(uw_cm2 * calib_factor * 2.8833333)
-    return max(0, min(4095, pwm_value))  # Clamp to 12-bit range
+    calib_factor = calibration.get(str(led_index), 1.0)  # Default to 1.0 if not in calibration
+    led_pwm = int(led_uwcm2 * calib_factor * 2.8833333)
+    return max(0, min(4095, led_pwm))  # Clamp to 12-bit range
 
 # -----------------------
 # LED Program and Control
@@ -136,7 +137,7 @@ while True:
         # Update each LED program and set intensity
         for i in range(NUM_CHANNELS):
             uw_intensity = led_programs[i].update(TICK_MS)  # µW/cm²
-            tlc[i] = uw_cm2_to_pwm(uw_intensity, i)  # Set PWM directly (12-bit)
+            led[i] = uw_cm2_to_pwm(uw_intensity, i)  # Set PWM directly (12-bit)
 
     # Small sleep to avoid high CPU usage
-    time.sleep(0.001)
+    time.sleep(SLEEP)
