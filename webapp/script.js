@@ -1,0 +1,645 @@
+document.addEventListener('DOMContentLoaded', () => {
+    const ledGridPane = document.getElementById('led-grid-pane');
+    const ledSelectionBoxContent = ledGridPane.querySelector('.box');
+
+    const placeholderText = ledSelectionBoxContent.querySelector('p');
+    if (placeholderText && placeholderText.textContent.includes('Loading grid...')) {
+        placeholderText.remove();
+    }
+
+    const numRows = 4;
+    const numCols = 6;
+    const totalLeds = numRows * numCols;
+
+    // --- State for selected LEDs ---
+    let selectedLedIndices = new Set(); // Use a Set to store 0-based indices of selected LEDs
+
+    // --- Helper function to update button appearance ---
+    function updateLedButtonAppearance(buttonElement, isSelected) {
+        if (isSelected) {
+            buttonElement.classList.remove('is-outlined');
+            buttonElement.classList.add('is-info'); // Or 'is-primary', 'is-success', etc.
+        } else {
+            buttonElement.classList.add('is-outlined');
+            buttonElement.classList.remove('is-info');
+        }
+    }
+
+    // --- Create the LED Grid ---
+    const gridContainer = document.createElement('div');
+    gridContainer.className = 'led-grid-actual mb-4';
+    gridContainer.style.display = 'grid';
+    gridContainer.style.gridTemplateColumns = `repeat(${numCols}, 1fr)`;
+    gridContainer.style.gap = '0.5rem';
+
+
+
+    // Store all LED button elements for easy access later
+    const allLedButtons = [];
+
+    for (let i = 0; i < totalLeds; i++) {
+        const ledButton = document.createElement('button');
+        const ledDisplayNumber = i + 1;
+
+        ledButton.className = 'button is-rounded is-outlined led-button';
+        ledButton.textContent = ledDisplayNumber;
+        ledButton.dataset.ledId = i; // 0-based index
+
+        // Event Listener for individual LED button clicks
+        ledButton.addEventListener('click', () => {
+            const ledId = parseInt(ledButton.dataset.ledId);
+            if (selectedLedIndices.has(ledId)) {
+                selectedLedIndices.delete(ledId);
+                updateLedButtonAppearance(ledButton, false);
+            } else {
+                selectedLedIndices.add(ledId);
+                updateLedButtonAppearance(ledButton, true);
+            }
+            currentlyViewedLedIndex = ledId; // <<< SET THE CURRENTLY VIEWED LED
+
+            console.log("Selected LEDs:", Array.from(selectedLedIndices).sort((a,b)=>a-b) ); // Log selected IDs
+            renderTimeline();                 // <<< RENDER ITS TIMELINE
+            // Later: update timeline based on selection
+        });
+
+        gridContainer.appendChild(ledButton);
+        allLedButtons.push(ledButton); // Add to our array
+    }
+    ledSelectionBoxContent.appendChild(gridContainer);
+
+    // --- Create Select All / Select None buttons ---
+    const selectActionsContainer = document.createElement('div');
+    selectActionsContainer.className = 'buttons';
+
+    const selectAllButton = document.createElement('button');
+    selectAllButton.className = 'button';
+    selectAllButton.id = 'select-all-leds';
+    selectAllButton.textContent = 'Select All';
+    selectAllButton.addEventListener('click', () => {
+        allLedButtons.forEach(btn => {
+            const ledId = parseInt(btn.dataset.ledId);
+            selectedLedIndices.add(ledId);
+            updateLedButtonAppearance(btn, true);
+        });
+        console.log("Selected LEDs:", Array.from(selectedLedIndices).sort((a,b)=>a-b) );
+    });
+
+    const selectNoneButton = document.createElement('button');
+    selectNoneButton.className = 'button';
+    selectNoneButton.id = 'select-none-leds';
+    selectNoneButton.textContent = 'Select None';
+    selectNoneButton.addEventListener('click', () => {
+        allLedButtons.forEach(btn => {
+            const ledId = parseInt(btn.dataset.ledId);
+            // selectedLedIndices.delete(ledId); // This would also work
+            updateLedButtonAppearance(btn, false);
+        });
+        selectedLedIndices.clear(); // More efficient to clear the set
+        console.log("Selected LEDs:", Array.from(selectedLedIndices).sort((a,b)=>a-b) );
+    });
+
+    selectActionsContainer.appendChild(selectAllButton);
+    selectActionsContainer.appendChild(selectNoneButton);
+    ledSelectionBoxContent.appendChild(selectActionsContainer);
+
+    console.log('LED Grid interaction enabled!');
+
+    // --- Step Editor Logic ---
+    const stepTypeSelect = document.getElementById('step-type');
+    const paramsOnDiv = document.getElementById('params-on');
+    const paramsRampDiv = document.getElementById('params-ramp');
+    const paramsSineDiv = document.getElementById('params-sine');
+    const paramsDurationDiv = document.getElementById('params-duration'); // Get the duration field group
+
+    // Store all parameter divs in an array for easy iteration
+    const allParamDivs = [paramsOnDiv, paramsRampDiv, paramsSineDiv];
+
+    function updateStepEditorForm() {
+        const selectedType = stepTypeSelect.value;
+
+        // Hide all specific parameter divs first
+        allParamDivs.forEach(div => {
+            if (div) div.style.display = 'none';
+        });
+        // Always show duration for now, will refine for OFF type
+        if (paramsDurationDiv) paramsDurationDiv.style.display = 'block';
+
+
+        // Show the relevant div based on selected type
+        if (selectedType === 'ON') {
+            if (paramsOnDiv) paramsOnDiv.style.display = 'block';
+        } else if (selectedType === 'RAMP') {
+            if (paramsRampDiv) paramsRampDiv.style.display = 'block';
+        } else if (selectedType === 'SINE') {
+            if (paramsSineDiv) paramsSineDiv.style.display = 'block';
+        } else if (selectedType === 'OFF') {
+            // For OFF, we might not need any specific params, and duration is still relevant.
+            // Or hide duration if OFF steps have no duration in your system?
+            // For now, OFF shows only duration.
+            if (paramsDurationDiv) paramsDurationDiv.style.display = 'block'; // Ensure duration is visible
+        }
+    }
+
+    // Add event listener to the step type dropdown
+    if (stepTypeSelect) {
+        stepTypeSelect.addEventListener('change', updateStepEditorForm);
+    }
+
+    // Call it once on page load to set the initial state based on the default dropdown value
+    updateStepEditorForm();
+
+    console.log('Step Editor form initialized!');
+
+    // --- Program Data Structure ---
+    let programData = {}; // Stores the program for all LEDs
+    const NUM_LEDS = 24; // From your Python script
+
+    // Initialize programData with empty arrays for each LED
+    for (let i = 0; i < NUM_LEDS; i++) {
+        programData[`LED${i}`] = [];
+    }
+    console.log("Initial programData:", JSON.parse(JSON.stringify(programData))); // Deep copy for clean log
+
+    // --- "Add Step" Button Logic ---
+    const addStepButton = document.getElementById('add-step-button');
+
+    // Get references to all input fields (do this once)
+    const onIntInput = document.getElementById('on-int');
+    const rampInt0Input = document.getElementById('ramp-int0');
+    const rampInt1Input = document.getElementById('ramp-int1');
+    const sineInt0Input = document.getElementById('sine-int0');
+    const sineInt1Input = document.getElementById('sine-int1');
+    const sineFreqInput = document.getElementById('sine-freq');
+    const stepDurationInput = document.getElementById('step-duration');
+
+
+        if (addStepButton) {
+        addStepButton.addEventListener('click', () => {
+            const type = stepTypeSelect.value;
+            let durationMs = parseInt(stepDurationInput.value);
+
+            // --- Get references to input fields (already defined outside this listener) ---
+            // const onIntInput = document.getElementById('on-int');
+            // const rampInt0Input = document.getElementById('ramp-int0');
+            // ... etc.
+
+            const MAX_INTENSITY = 1400;
+            const MIN_DURATION = 50; // Minimum allowed duration in ms
+
+            if (selectedLedIndices.size === 0) {
+                alert("Please select at least one LED before adding a step.");
+                return;
+            }
+
+            // --- Validate and Clamp Duration ---
+            if (isNaN(durationMs) || durationMs < MIN_DURATION) {
+                alert(`Duration must be a number and at least ${MIN_DURATION} ms.`);
+                stepDurationInput.value = MIN_DURATION; // Correct the input field
+                // Optionally focus the field: stepDurationInput.focus();
+                return;
+            }
+
+            let step = {
+                type: type,
+                duration_ms: durationMs
+            };
+
+            // --- Helper function for clamping intensity ---
+            function clampIntensity(value) {
+                let numValue = parseInt(value);
+                if (isNaN(numValue)) numValue = 0; // Default to 0 if not a number
+                if (numValue < 0) return 0;
+                if (numValue > MAX_INTENSITY) return MAX_INTENSITY;
+                return numValue;
+            }
+
+            // --- Helper function for clamping frequency ---
+            function clampFrequency(value) {
+                let numValue = parseFloat(value);
+                if (isNaN(numValue)) numValue = 0;
+                if (numValue < 0) return 0;
+                return numValue;
+            }
+
+
+            // Add type-specific parameters with validation and clamping
+            switch (type) {
+                case 'ON':
+                    const onIntValue = clampIntensity(onIntInput.value);
+                    step.int = onIntValue;
+                    onIntInput.value = onIntValue; // Update input field if clamped
+                    break;
+                case 'RAMP':
+                    const rampInt0Value = clampIntensity(rampInt0Input.value);
+                    const rampInt1Value = clampIntensity(rampInt1Input.value);
+                    step.int0 = rampInt0Value;
+                    step.int1 = rampInt1Value;
+                    rampInt0Input.value = rampInt0Value; // Update input fields
+                    rampInt1Input.value = rampInt1Value;
+                    break;
+                case 'SINE':
+                    const sineInt0Value = clampIntensity(sineInt0Input.value);
+                    const sineInt1Value = clampIntensity(sineInt1Input.value);
+                    const sineFreqValue = clampFrequency(sineFreqInput.value);
+                    step.int0 = sineInt0Value;
+                    step.int1 = sineInt1Value;
+                    step.freq = sineFreqValue;
+                    sineInt0Input.value = sineInt0Value; // Update input fields
+                    sineInt1Input.value = sineInt1Value;
+                    sineFreqInput.value = sineFreqValue;
+
+                    // Optional: Ensure int0 <= int1 for SINE/RAMP if that's a logical requirement
+                    if (step.int0 > step.int1 && (type === 'SINE' || type === 'RAMP')) {
+                            // Swap them or alert, for now, let's just note it.
+                            // console.warn(`${type}: int0 (${step.int0}) is greater than int1 (${step.int1}). Consider handling this.`);
+                            // For simplicity, we'll allow it, Python script might handle it or user needs to be aware
+                    }
+                    break;
+                case 'OFF':
+                    // No intensity/frequency params for OFF
+                    break;
+            }
+
+            // Add the created step to all currently selected LEDs
+            selectedLedIndices.forEach(ledIndex => {
+                if (!programData[`LED${ledIndex}`]) {
+                    programData[`LED${ledIndex}`] = [];
+                }
+                programData[`LED${ledIndex}`].push(step);
+            });
+
+            console.log("Updated programData (with validation):", JSON.parse(JSON.stringify(programData)));
+            // No need for an alert here if the timeline updates, or make it a less intrusive notification
+            // alert(`Step added to ${selectedLedIndices.size} LED(s)!`);
+
+            renderTimeline(); // Update the visual timeline
+        });
+    }
+
+
+const removeStepButton = document.getElementById('remove-step-button');
+
+    if (removeStepButton) {
+        removeStepButton.addEventListener('click', () => {
+            if (selectedLedIndices.size === 0) {
+                alert("Please select at least one LED from which to remove a step.");
+                return;
+            }
+
+            let
+             removedStepFromAtLeastOne = false;
+            selectedLedIndices.forEach(ledIndex => {
+                const ledKey = `LED${ledIndex}`;
+                if (programData[ledKey] && programData[ledKey].length > 0) {
+                    programData[ledKey].pop(); // .pop() removes the last element from an array
+                    removedStepFromAtLeastOne = true;
+                }
+            });
+
+            if (removedStepFromAtLeastOne) {
+                console.log("After removing step - programData:", JSON.parse(JSON.stringify(programData)));
+                alert(`Last step removed from selected LED(s) where applicable. Check the console.`);
+            } else {
+                alert("No steps to remove from the selected LED(s).");
+            }
+
+            renderTimeline();
+        });
+    }
+
+    console.log('Remove Step button initialized!'); // Add this new log
+
+    
+    const timelineDisplayDiv = document.getElementById('timeline-display');
+    const timelineLedLabel = document.getElementById('timeline-led-label'); // Get the span for the label
+
+    // --- State for currently viewed timeline ---
+    let currentlyViewedLedIndex = null; // 0-based index
+
+    // --- Function to update the timeline display ---
+    function renderTimeline() {
+        if (timelineDisplayDiv) {
+            timelineDisplayDiv.innerHTML = '';
+        } else {
+            console.error("Timeline display div not found!");
+            return;
+        }
+
+        if (timelineLedLabel) {
+            if (currentlyViewedLedIndex !== null) {
+                timelineLedLabel.textContent = `LED ${currentlyViewedLedIndex + 1}`;
+            } else {
+                timelineLedLabel.textContent = 'No LED Selected for Timeline';
+            }
+        }
+
+        if (currentlyViewedLedIndex === null || !programData[`LED${currentlyViewedLedIndex}`]) {
+            const noStepsMsg = document.createElement('p');
+            noStepsMsg.className = 'has-text-centered has-text-grey p-4';
+            noStepsMsg.textContent = (currentlyViewedLedIndex !== null) ? `LED ${currentlyViewedLedIndex + 1} has no steps yet.` : 'No LED selected to display timeline.';
+            timelineDisplayDiv.appendChild(noStepsMsg);
+            return;
+        }
+
+        const steps = programData[`LED${currentlyViewedLedIndex}`];
+
+        if (steps.length === 0) {
+            const noStepsMsg = document.createElement('p');
+            noStepsMsg.className = 'has-text-centered has-text-grey p-4';
+            noStepsMsg.textContent = `LED ${currentlyViewedLedIndex + 1} has no steps.`;
+            timelineDisplayDiv.appendChild(noStepsMsg);
+            return;
+        }
+
+        // --- Define Block Sizes ---
+        const BLOCK_SIZE_SMALL_PX = 80;  // For durations <= 2000ms
+        const BLOCK_SIZE_MEDIUM_PX = 120; // For durations > 2000ms and <= 5000ms
+        const BLOCK_SIZE_LARGE_PX = 160;  // For durations > 5000ms
+        // These are example pixel values, adjust as you see fit!
+
+        let cumulativeTimeMs = 0; // Still track actual cumulative time for markers
+
+        const timelineWrapper = document.createElement('div');
+        timelineWrapper.style.display = 'flex';
+        timelineWrapper.style.position = 'relative';
+        timelineWrapper.style.minHeight = '100px';
+        timelineWrapper.style.paddingTop = '20px'; // Add padding at the top of the wrapper for time markers
+
+        steps.forEach((step, index) => {
+            const stepBlock = document.createElement('div');
+            stepBlock.className = 'timeline-step-block';
+            stepBlock.style.minHeight = '80px';
+            stepBlock.style.border = '1px solid #ccc';
+            stepBlock.style.marginRight = '5px'; // Increased margin a bit
+            stepBlock.style.padding = '5px';
+            stepBlock.style.fontSize = '0.8em';
+            stepBlock.style.overflow = 'hidden';
+            stepBlock.style.position = 'relative'; // For text content
+
+            // --- Assign categorized width ---
+            if (step.duration_ms <= 2000) {
+                stepBlock.style.width = `${BLOCK_SIZE_SMALL_PX}px`;
+            } else if (step.duration_ms <= 5000) {
+                stepBlock.style.width = `${BLOCK_SIZE_MEDIUM_PX}px`;
+            } else {
+                stepBlock.style.width = `${BLOCK_SIZE_LARGE_PX}px`;
+            }
+
+            // Set background color and content based on step type
+            let stepContent = `<strong>${step.type.toUpperCase()}</strong><br>`;
+            switch (step.type) {
+                case 'ON':
+                    stepBlock.style.backgroundColor = 'lightgreen';
+                    stepContent += `Int: ${step.int}<br>Dur: ${step.duration_ms}ms`;
+                    break;
+                case 'OFF':
+                    stepBlock.style.backgroundColor = 'lightcoral';
+                    stepContent += `Dur: ${step.duration_ms}ms`;
+                    break;
+                case 'RAMP':
+                    stepBlock.style.backgroundColor = 'lightskyblue';
+                    stepContent += `${step.int0}➔${step.int1}<br>Dur: ${step.duration_ms}ms`;
+                    break;
+                case 'SINE':
+                    stepBlock.style.backgroundColor = 'lightgoldenrodyellow';
+                    stepContent += `${step.int0}~${step.int1}<br>F:${step.freq} Dur:${step.duration_ms}ms`;
+                    break;
+                default:
+                    stepBlock.style.backgroundColor = 'lightgrey';
+            }
+            stepBlock.innerHTML = stepContent;
+            timelineWrapper.appendChild(stepBlock);
+
+            // --- Time Marker Logic (Needs Adjustment for Fixed Widths) ---
+            // To position markers correctly with fixed block widths, we need to sum up the *actual block widths used*
+            // Or, we can simplify and just place a marker after each block visually.
+            // Let's try a simpler visual marker for now, placed relative to the end of each block.
+            // For more accurate time markers with categorized widths, it gets more complex.
+            // We'll keep the cumulativeTimeMs for the *text* of the marker.
+
+            cumulativeTimeMs += step.duration_ms; // This remains the actual time
+
+            // Add a visual separator / end-of-step marker (simpler than precise time)
+            // The previous absolute time marker logic based on scaled ms won't align well with fixed block sizes.
+            // We'll place a simple vertical line *inside* the timelineWrapper, after each block.
+            // This is more of a "step separator" than a precise time axis marker now.
+        });
+
+        // Add time markers based on cumulative *actual* step durations, but place them
+        // at the end of each *visual block*. This will make the time scale non-linear.
+        let currentPixelOffset = 0;
+        let actualCumulativeTime = 0;
+        steps.forEach((step, index) => {
+            let blockWidthPx;
+            if (step.duration_ms <= 2000) {
+                blockWidthPx = BLOCK_SIZE_SMALL_PX;
+            } else if (step.duration_ms <= 5000) {
+                blockWidthPx = BLOCK_SIZE_MEDIUM_PX;
+            } else {
+                blockWidthPx = BLOCK_SIZE_LARGE_PX;
+            }
+            // Add the margin-right of the block to the offset for the marker
+            currentPixelOffset += blockWidthPx + 5; // 5px is the margin-right
+            actualCumulativeTime += step.duration_ms;
+
+            const timeMarker = document.createElement('div');
+            timeMarker.className = 'timeline-time-marker';
+            timeMarker.style.position = 'absolute';
+            // Position marker at the end of the current visual block
+            timeMarker.style.left = `${currentPixelOffset - 2}px`; // Adjust -2 for line thickness/centering
+            timeMarker.style.top = '-5px'; // Position above the blocks (adjust from timelineWrapper's padding-top)
+            timeMarker.style.height = '10px'; // Short line
+            timeMarker.style.fontSize = '0.7em';
+            timeMarker.style.borderLeft = '1px dotted #555';
+            timeMarker.style.paddingLeft = '3px';
+            timeMarker.innerHTML = `${actualCumulativeTime}<span style="font-size:0.8em;">ms</span>`; // Display actual time
+            timelineWrapper.appendChild(timeMarker);
+        });
+
+
+        timelineDisplayDiv.appendChild(timelineWrapper);
+    }
+
+    const exportButton = document.getElementById('export-button');
+
+        if (exportButton) {
+            exportButton.addEventListener('click', () => {
+                // Check if there's anything to export
+                let hasAnySteps = false;
+                for (const ledKey in programData) {
+                    if (programData[ledKey].length > 0) {
+                        hasAnySteps = true;
+                        break;
+                    }
+                }
+
+                if (!hasAnySteps) {
+                    alert("The program is empty. Add some steps before exporting.");
+                    return;
+                }
+
+                // The programData should already be in the correct format:
+                // { "LED0": [...steps...], "LED1": [...steps...], ... }
+                // Convert the programData object to a JSON string
+                // The 'null, 2' arguments pretty-print the JSON with an indent of 2 spaces
+                const jsonString = JSON.stringify(programData, null, 2);
+
+                // Create a Blob with the JSON string
+                const blob = new Blob([jsonString], { type: 'application/json' });
+
+                // Create a temporary anchor element (<a>) to trigger the download
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob); // Set the href to a URL representing the Blob
+                a.download = 'program.json';     // Set the desired filename for the download
+
+                // Append the anchor to the body, click it, then remove it
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+
+                // Revoke the object URL to free up resources
+                URL.revokeObjectURL(a.href);
+
+                console.log("program.json exported.");
+                alert("program.json has been prepared for download!");
+            });
+        }
+
+    console.log('Export button initialized!')
+
+const loadProgramButton = document.getElementById('load-program-button');
+    const fileInput = document.getElementById('file-input');
+
+    if (loadProgramButton && fileInput) {
+        loadProgramButton.addEventListener('click', () => {
+            fileInput.click(); // Programmatically click the hidden file input
+        });
+
+        fileInput.addEventListener('change', (event) => {
+            const file = event.target.files[0]; // Get the selected file
+
+            if (file) {
+                const reader = new FileReader();
+
+                reader.onload = (e) => {
+                    try {
+                        const fileContent = e.target.result;
+                        const loadedProgram = JSON.parse(fileContent);
+
+                        // --- Basic Validation of loadedProgram structure ---
+                        if (typeof loadedProgram !== 'object' || loadedProgram === null) {
+                            throw new Error("Invalid JSON structure: not an object.");
+                        }
+                        let isValidStructure = true;
+                        for (let i = 0; i < NUM_LEDS; i++) {
+                            const ledKey = `LED${i}`;
+                            if (!loadedProgram.hasOwnProperty(ledKey) || !Array.isArray(loadedProgram[ledKey])) {
+                                isValidStructure = false;
+                                break;
+                            }
+                            // Further validation: check if each item in the array is a valid step object
+                            loadedProgram[ledKey].forEach(step => {
+                                if (typeof step !== 'object' || step === null || !step.type || !step.hasOwnProperty('duration_ms')) {
+                                    // Add more checks for type-specific params if needed
+                                    isValidStructure = false;
+                                }
+                            });
+                            if(!isValidStructure) break;
+                        }
+
+                        if (!isValidStructure) {
+                            throw new Error("Loaded program.json has an invalid or incomplete structure for some LEDs.");
+                        }
+
+                        // If valid, replace current programData
+                        programData = loadedProgram;
+                        console.log("Program loaded successfully:", JSON.parse(JSON.stringify(programData)));
+                        alert("Program loaded successfully!");
+
+                        // Refresh UI elements
+                        // 1. Potentially clear/update selectedLedIndices (or decide on behavior)
+                        //    For now, let's keep current selection, timeline will update for viewed LED.
+                        // selectedLedIndices.clear(); // Optional: clear selection
+                        // allLedButtons.forEach(btn => updateLedButtonAppearance(btn, false)); // Optional: update UI
+
+                        // 2. Update the timeline for the currently viewed LED (if any)
+                        renderTimeline();
+
+                        // 3. (Future) If you were saving/loading LED selection states, update those too.
+
+                    } catch (error) {
+                        console.error("Error loading or parsing program.json:", error);
+                        alert(`Error loading program.json: ${error.message}`);
+                    } finally {
+                        // Reset file input to allow loading the same file again if needed
+                        fileInput.value = '';
+                    }
+                };
+
+                reader.onerror = (error) => {
+                    console.error("Error reading file:", error);
+                    alert("Error reading file.");
+                    fileInput.value = ''; // Reset
+                };
+
+                reader.readAsText(file); // Read the file as plain text
+            }
+        });
+    }
+    console.log('Load Program button initialized!');
+    // --- Dark Mode Toggle Logic ---
+    const darkModeToggleButton = document.getElementById('darkModeToggle');
+    const htmlElement = document.documentElement; // Get the <html> element
+
+    // Function to apply theme based on preference
+    function applyTheme(theme) {
+        if (theme === 'dark') {
+            htmlElement.classList.add('dark-mode');
+            if (darkModeToggleButton) { // Update button icon/text if needed
+                darkModeToggleButton.querySelector('i').classList.remove('fa-moon');
+                darkModeToggleButton.querySelector('i').classList.add('fa-sun');
+            }
+        } else {
+            htmlElement.classList.remove('dark-mode');
+            if (darkModeToggleButton) {
+                darkModeToggleButton.querySelector('i').classList.remove('fa-sun');
+                darkModeToggleButton.querySelector('i').classList.add('fa-moon');
+            }
+        }
+    }
+
+    if (darkModeToggleButton) {
+        darkModeToggleButton.addEventListener('click', () => {
+            let currentTheme = 'light';
+            if (htmlElement.classList.contains('dark-mode')) {
+                currentTheme = 'dark';
+            }
+
+            if (currentTheme === 'dark') {
+                applyTheme('light');
+                localStorage.setItem('theme', 'light'); // Save preference
+            } else {
+                applyTheme('dark');
+                localStorage.setItem('theme', 'dark'); // Save preference
+            }
+        });
+    }
+
+    // Check for saved theme preference on page load
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+        applyTheme(savedTheme);
+    } else {
+        // Optional: Check for OS preference if no user preference saved
+        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+            applyTheme('dark');
+        } else {
+            applyTheme('light'); // Default to light
+        }
+    }
+    console.log('Dark mode toggle initialized!');
+    // Initial render on page load (will show "No LED selected" message)
+    currentlyViewedLedIndex = ledId;
+    renderTimeline();
+    console.log('Timeline rendering initialized!');
+});

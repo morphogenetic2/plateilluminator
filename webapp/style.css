@@ -1,0 +1,163 @@
+/* style.css */
+/* ... (your existing styles) ... */
+
+#timeline-display {
+    /* Ensure overflow-x: auto; is still on the parent if needed */
+    /* background-color: #f7f7f7; */
+    /* padding-top: 25px; /* We moved padding to timelineWrapper */
+}
+
+.timeline-step-block {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    box-sizing: border-box;
+    position: relative;
+    word-break: break-word; /* Helps with text fitting */
+    /* margin-right: 5px; /* Now set in JS for consistent spacing with markers */
+}
+
+.timeline-time-marker {
+    white-space: nowrap;
+    /* Other styles are set in JS */
+}
+
+/* Dark mode specific for timeline blocks if needed */
+html.dark-mode .timeline-step-block {
+    border-color: #4a4a4a;
+    color: #333; /* Text color for light backgrounds on blocks */
+}
+html.dark-mode #timeline-display {
+    background-color: #2e2e2e; /* Or your chosen dark mode background */
+    border-color: #444;
+}
+html.dark-mode #timeline-display p {
+    color: #ccc;
+}
+html.dark-mode .timeline-time-marker {
+    color: #ddd;
+    border-left-color: #777;
+}
+/* Dark mode overrides for step block backgrounds (same as before) */
+html.dark-mode .timeline-step-block[style*="background-color: lightgreen"] {
+    background-color: #204020 !important; color: #c8e6c9 !important;
+}
+html.dark-mode .timeline-step-block[style*="background-color: lightcoral"] {
+    background-color: #502020 !important; color: #ffcdd2 !important;
+}
+html.dark-mode .timeline-step-block[style*="background-color: lightskyblue"] {
+    background-color: #103050 !important; color: #b3e5fc !important;
+}
+html.dark-mode .timeline-step-block[style*="background-color: lightgoldenrodyellow"] {
+    background-color: #505020 !important; color: #fff9c4 !important;
+}
+
+
+/* --- Dark Mode Base --- */
+html.dark-mode {
+    background-color: #1e1e1e;
+    color: #e0e0e0; /* Slightly off-white for better readability */
+}
+
+html.dark-mode body {
+    color: #e0e0e0;
+}
+
+html.dark-mode .box {
+    background-color: #2a2a2a;
+    /* color: #e0e0e0; /* Inherits from body or html.dark-mode */
+    border-color: #444; /* Darker border for boxes */
+}
+
+html.dark-mode .title,
+html.dark-mode .subtitle,
+html.dark-mode .label {
+    color: #f0f0f0; /* Brighter white for prominent text */
+}
+
+/* --- Dark Mode for Form Elements --- */
+html.dark-mode .input,
+html.dark-mode .select select,
+html.dark-mode textarea { /* If you add textareas later */
+    background-color: #3a3a3a;
+    border-color: #555555;
+    color: #e0e0e0;
+}
+html.dark-mode .input::placeholder,
+html.dark-mode textarea::placeholder {
+    color: #888; /* Lighter placeholder text */
+}
+
+/* --- Dark Mode for Buttons --- */
+html.dark-mode .button:not([class*="is-"]) { /* Default button */
+    background-color: #3a3a3a;
+    border-color: #555555;
+    color: #e0e0e0;
+}
+html.dark-mode .button:not([class*="is-"]):hover {
+    background-color: #4a4a4a;
+    border-color: #666666;
+}
+
+html.dark-mode .button.is-outlined {
+    background-color: transparent;
+    border-color: #555555; /* Or a theme color */
+    color: #e0e0e0; /* Or a theme color */
+}
+html.dark-mode .button.is-outlined:hover {
+    background-color: rgba(200, 200, 200, 0.1); /* Slight hover for outlined */
+}
+
+/* Keep Bulma's intent for colored buttons (is-primary, is-info, etc.) */
+/* These usually have light text, so they work okay on dark backgrounds,
+   but you can override them if needed. Example for is-info: */
+html.dark-mode .button.is-info {
+    /* background-color: #296fa8; /* Darker shade of info */
+    /* border-color: transparent; */
+    /* color: #fff; */
+}
+/* Example for is-success */
+html.dark-mode .button.is-success {
+    /* background-color: #38761d; /* Darker shade of success */
+    /* border-color: transparent; */
+}
+
+
+/* --- Dark Mode for Timeline --- */
+html.dark-mode #timeline-display {
+    background-color: #2e2e2e;
+    border-color: #444;
+}
+html.dark-mode #timeline-display p { /* Placeholder text in timeline */
+    color: #aaa;
+}
+html.dark-mode .timeline-step-block { /* Default if not overridden by type-specific */
+    border-color: #4a4a4a;
+    color: #333; /* Text for light backgrounds on blocks */
+}
+html.dark-mode .timeline-time-marker {
+    color: #ddd;
+    border-left-color: #777;
+}
+html.dark-mode .timeline-step-block[style*="background-color: lightgreen"] {
+    background-color: #2a522a !important; color: #c8e6c9 !important;
+}
+html.dark-mode .timeline-step-block[style*="background-color: lightcoral"] {
+    background-color: #6b2f2f !important; color: #ffcdd2 !important;
+}
+html.dark-mode .timeline-step-block[style*="background-color: lightskyblue"] {
+    background-color: #2a4e6f !important; color: #b3e5fc !important;
+}
+html.dark-mode .timeline-step-block[style*="background-color: lightgoldenrodyellow"] {
+    background-color: #706522 !important; color: #fff9c4 !important;
+}
+html.dark-mode .timeline-step-block[style*="background-color: lightgrey"] {
+    background-color: #4d4d4d !important; color: #f0f0f0 !important;
+}
+
+/* --- Dark Mode for Horizontal Rule --- */
+html.dark-mode hr {
+    background-color: #444;
+}
