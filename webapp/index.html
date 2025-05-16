@@ -7,6 +7,8 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script> <!-- Add SortableJS -->
+    <script src="script.js"></script>
 </head>
 <body>
 
@@ -29,11 +31,12 @@
             <div class="columns">
                 <!-- Left Pane: LED Grid -->
                 <div class="column is-one-third" id="led-grid-pane">
-                    <div class="box">
-                        <h2 class="title is-4 has-text-centered">LED Selection</h2>
-                        <p class="has-text-centered">Loading grid...</p>
+                        <div class="box">
+                            <h2 class="title is-4 has-text-centered">LED Selection</h2>
+                            <!-- JavaScript will add LED grid here -->
+                            <!-- selectActionsContainer will be created by JS -->
+                        </div>
                     </div>
-                </div>
 
                 <!-- Right Pane: Step Editor -->
                 <div class="column is-two-thirds" id="step-editor-pane">
@@ -121,7 +124,6 @@
             </div> <!-- END OF ROW 1 -->
 
             <!-- ROW 2: Program Timeline -->
-            <!-- ROW 2: Program Timeline -->
                 <div class="columns">
                     <div class="column">
                         <div class="box" id="timeline-pane"> <!-- id="timeline-pane" is on the box -->
@@ -167,6 +169,6 @@
         </div> <!-- End of container is-fluid -->
     </section>
 
-    <script src="script.js"></script>
+    
 </body>
 </html>

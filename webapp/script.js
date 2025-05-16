@@ -68,11 +68,13 @@ document.addEventListener('DOMContentLoaded', () => {
     ledSelectionBoxContent.appendChild(gridContainer);
 
     // --- Create Select All / Select None buttons ---
-    const selectActionsContainer = document.createElement('div');
-    selectActionsContainer.className = 'buttons';
+        // ---- MODIFIED/NEW SECTION for action buttons in LED Selection ----
+    const ledActionsContainer = document.createElement('div');
+    ledActionsContainer.className = 'field is-grouped is-grouped-multiline mt-4'; // For better wrapping if needed
 
+    // Select All Button (ensure it's created and added here)
     const selectAllButton = document.createElement('button');
-    selectAllButton.className = 'button';
+    selectAllButton.className = 'button control'; // Added 'control' for grouping
     selectAllButton.id = 'select-all-leds';
     selectAllButton.textContent = 'Select All';
     selectAllButton.addEventListener('click', () => {
@@ -82,25 +84,72 @@ document.addEventListener('DOMContentLoaded', () => {
             updateLedButtonAppearance(btn, true);
         });
         console.log("Selected LEDs:", Array.from(selectedLedIndices).sort((a,b)=>a-b) );
+        // No timeline update needed here unless your logic changes
     });
+    ledActionsContainer.appendChild(selectAllButton);
 
+
+    // Select None Button (ensure it's created and added here)
     const selectNoneButton = document.createElement('button');
-    selectNoneButton.className = 'button';
+    selectNoneButton.className = 'button control'; // Added 'control'
     selectNoneButton.id = 'select-none-leds';
     selectNoneButton.textContent = 'Select None';
     selectNoneButton.addEventListener('click', () => {
         allLedButtons.forEach(btn => {
-            const ledId = parseInt(btn.dataset.ledId);
-            // selectedLedIndices.delete(ledId); // This would also work
             updateLedButtonAppearance(btn, false);
         });
-        selectedLedIndices.clear(); // More efficient to clear the set
+        selectedLedIndices.clear();
         console.log("Selected LEDs:", Array.from(selectedLedIndices).sort((a,b)=>a-b) );
+        if (currentlyViewedLedIndex !== null && !selectedLedIndices.has(currentlyViewedLedIndex)) {
+            // If the timeline LED is no longer selected, perhaps clear timeline or show "no selection"
+            // For now, timeline stays on the last explicitly clicked LED.
+        }
+        // renderTimeline(); // Only if deselection should immediately clear timeline for a deselected viewed LED
     });
+    ledActionsContainer.appendChild(selectNoneButton);
 
-    selectActionsContainer.appendChild(selectAllButton);
-    selectActionsContainer.appendChild(selectNoneButton);
-    ledSelectionBoxContent.appendChild(selectActionsContainer);
+
+    // **NEW** Clear Program for Selected LEDs Button
+    const clearSelectedProgramButton = document.createElement('button');
+    clearSelectedProgramButton.className = 'button is-warning control'; // 'is-warning' for a bit of caution
+    clearSelectedProgramButton.id = 'clear-selected-program';
+    clearSelectedProgramButton.innerHTML = '<span class="icon is-small"><i class="fas fa-eraser"></i></span><span>Clear Selected</span>'; // Icon + Text
+
+    clearSelectedProgramButton.addEventListener('click', () => {
+        if (selectedLedIndices.size === 0) {
+            alert("Please select one or more LEDs to clear their program.");
+            return;
+        }
+
+        // Confirmation dialog
+        if (!confirm(`Are you sure you want to clear the program for ${selectedLedIndices.size} selected LED(s)? This cannot be undone.`)) {
+            return;
+        }
+
+        let clearedAtLeastOne = false;
+        selectedLedIndices.forEach(ledIndex => {
+            const ledKey = `LED${ledIndex}`;
+            if (programData[ledKey] && programData[ledKey].length > 0) {
+                programData[ledKey] = []; // Reset the array of steps to empty
+                clearedAtLeastOne = true;
+            }
+        });
+
+        if (clearedAtLeastOne) {
+            console.log("Program cleared for selected LEDs. programData:", JSON.parse(JSON.stringify(programData)));
+            alert("Program for selected LED(s) has been cleared.");
+            // If the currently viewed timeline LED was among those cleared, its timeline needs to update
+            if (currentlyViewedLedIndex !== null && selectedLedIndices.has(currentlyViewedLedIndex)) {
+                renderTimeline();
+            }
+        } else {
+            alert("Selected LED(s) already have an empty program.");
+        }
+    });
+    ledActionsContainer.appendChild(clearSelectedProgramButton); // Add the new button
+
+    // Append the container with all three buttons
+    ledSelectionBoxContent.appendChild(ledActionsContainer);
 
     console.log('LED Grid interaction enabled!');
 
@@ -317,13 +366,18 @@ const removeStepButton = document.getElementById('remove-step-button');
     let currentlyViewedLedIndex = null; // 0-based index
 
     // --- Function to update the timeline display ---
+        // --- Function to update the timeline display ---
+    // Ensure 'timelineSortableInstance' is declared outside this function, e.g., let timelineSortableInstance = null;
+    // Ensure 'programData', 'currentlyViewedLedIndex', 'timelineDisplayDiv', 'timelineLedLabel' are accessible in this scope.
+
+    timelineSortableInstance = null;
+
     function renderTimeline() {
-        if (timelineDisplayDiv) {
-            timelineDisplayDiv.innerHTML = '';
-        } else {
+        if (!timelineDisplayDiv) {
             console.error("Timeline display div not found!");
             return;
         }
+        timelineDisplayDiv.innerHTML = ''; // Clear previous timeline content
 
         if (timelineLedLabel) {
             if (currentlyViewedLedIndex !== null) {
@@ -331,6 +385,12 @@ const removeStepButton = document.getElementById('remove-step-button');
             } else {
                 timelineLedLabel.textContent = 'No LED Selected for Timeline';
             }
+        }
+
+        // Destroy previous Sortable instance if it exists
+        if (timelineSortableInstance) {
+            timelineSortableInstance.destroy();
+            timelineSortableInstance = null;
         }
 
         if (currentlyViewedLedIndex === null || !programData[`LED${currentlyViewedLedIndex}`]) {
@@ -351,32 +411,33 @@ const removeStepButton = document.getElementById('remove-step-button');
             return;
         }
 
-        // --- Define Block Sizes ---
-        const BLOCK_SIZE_SMALL_PX = 80;  // For durations <= 2000ms
-        const BLOCK_SIZE_MEDIUM_PX = 120; // For durations > 2000ms and <= 5000ms
-        const BLOCK_SIZE_LARGE_PX = 160;  // For durations > 5000ms
-        // These are example pixel values, adjust as you see fit!
-
-        let cumulativeTimeMs = 0; // Still track actual cumulative time for markers
+        // Define Block Sizes
+        const BLOCK_SIZE_SMALL_PX = 80;
+        const BLOCK_SIZE_MEDIUM_PX = 120;
+        const BLOCK_SIZE_LARGE_PX = 160;
 
         const timelineWrapper = document.createElement('div');
+        // Optional: Give it a unique ID if needed for complex scenarios, though destroying instance is primary
+        // timelineWrapper.id = `timeline-wrapper-led-${currentlyViewedLedIndex}`;
         timelineWrapper.style.display = 'flex';
         timelineWrapper.style.position = 'relative';
         timelineWrapper.style.minHeight = '100px';
-        timelineWrapper.style.paddingTop = '20px'; // Add padding at the top of the wrapper for time markers
+        timelineWrapper.style.paddingTop = '25px'; // Space for time markers above
 
-        steps.forEach((step, index) => {
+        steps.forEach((step, originalIndex) => {
             const stepBlock = document.createElement('div');
-            stepBlock.className = 'timeline-step-block';
+            stepBlock.className = 'timeline-step-block draggable-step'; // For styling and SortableJS
+            stepBlock.dataset.stepOriginalIndex = originalIndex; // Store original index before any sorts
+
             stepBlock.style.minHeight = '80px';
             stepBlock.style.border = '1px solid #ccc';
-            stepBlock.style.marginRight = '5px'; // Increased margin a bit
+            stepBlock.style.marginRight = '5px';
             stepBlock.style.padding = '5px';
             stepBlock.style.fontSize = '0.8em';
-            stepBlock.style.overflow = 'hidden';
-            stepBlock.style.position = 'relative'; // For text content
+            stepBlock.style.overflow = 'hidden'; // Or 'auto' if content might exceed
+            stepBlock.style.position = 'relative';
 
-            // --- Assign categorized width ---
+            // Assign categorized width
             if (step.duration_ms <= 2000) {
                 stepBlock.style.width = `${BLOCK_SIZE_SMALL_PX}px`;
             } else if (step.duration_ms <= 5000) {
@@ -385,7 +446,6 @@ const removeStepButton = document.getElementById('remove-step-button');
                 stepBlock.style.width = `${BLOCK_SIZE_LARGE_PX}px`;
             }
 
-            // Set background color and content based on step type
             let stepContent = `<strong>${step.type.toUpperCase()}</strong><br>`;
             switch (step.type) {
                 case 'ON':
@@ -402,34 +462,52 @@ const removeStepButton = document.getElementById('remove-step-button');
                     break;
                 case 'SINE':
                     stepBlock.style.backgroundColor = 'lightgoldenrodyellow';
-                    stepContent += `${step.int0}~${step.int1}<br>F:${step.freq} Dur:${step.duration_ms}ms`;
+                    stepContent += `${step.int0}~${step.int1}<br>F:${step.freq}Hz<br>Dur:${step.duration_ms}ms`;
                     break;
                 default:
                     stepBlock.style.backgroundColor = 'lightgrey';
+                    stepContent += `Dur: ${step.duration_ms}ms`; // Fallback content
             }
             stepBlock.innerHTML = stepContent;
             timelineWrapper.appendChild(stepBlock);
-
-            // --- Time Marker Logic (Needs Adjustment for Fixed Widths) ---
-            // To position markers correctly with fixed block widths, we need to sum up the *actual block widths used*
-            // Or, we can simplify and just place a marker after each block visually.
-            // Let's try a simpler visual marker for now, placed relative to the end of each block.
-            // For more accurate time markers with categorized widths, it gets more complex.
-            // We'll keep the cumulativeTimeMs for the *text* of the marker.
-
-            cumulativeTimeMs += step.duration_ms; // This remains the actual time
-
-            // Add a visual separator / end-of-step marker (simpler than precise time)
-            // The previous absolute time marker logic based on scaled ms won't align well with fixed block sizes.
-            // We'll place a simple vertical line *inside* the timelineWrapper, after each block.
-            // This is more of a "step separator" than a precise time axis marker now.
         });
 
-        // Add time markers based on cumulative *actual* step durations, but place them
-        // at the end of each *visual block*. This will make the time scale non-linear.
+        timelineDisplayDiv.appendChild(timelineWrapper); // Add wrapper to DOM before initializing Sortable
+
+        // Initialize SortableJS on the timelineWrapper
+        if (steps.length > 0) {
+            timelineSortableInstance = new Sortable(timelineWrapper, {
+                animation: 150,
+                ghostClass: 'sortable-ghost',
+                chosenClass: 'sortable-chosen',
+                dragClass: 'sortable-drag',
+                filter: '.timeline-time-marker', // Elements with this class will not be draggable
+                preventOnFilter: true,      // Clicks on filtered elements prevent dragging
+
+                onEnd: function (evt) {
+                    if (evt.oldIndex === evt.newIndex) {
+                        return; // Item dropped in the same place
+                    }
+
+                    console.log(`Step moved for LED${currentlyViewedLedIndex}: from index ${evt.oldIndex} to ${evt.newIndex}`);
+
+                    const programForCurrentLed = programData[`LED${currentlyViewedLedIndex}`];
+                    if (programForCurrentLed) {
+                        const [movedItem] = programForCurrentLed.splice(evt.oldIndex, 1);
+                        programForCurrentLed.splice(evt.newIndex, 0, movedItem);
+
+                        console.log("programData updated after drag:", JSON.parse(JSON.stringify(programData)));
+                        renderTimeline(); // Re-render to update indices and time markers
+                    }
+                }
+            });
+        }
+
+        // Time Marker Logic (after SortableJS is initialized on the wrapper)
+        // This ensures markers are added to the same wrapper that Sortable controls
         let currentPixelOffset = 0;
         let actualCumulativeTime = 0;
-        steps.forEach((step, index) => {
+        steps.forEach((step) => { // We don't need 'index' here if just iterating for calculation
             let blockWidthPx;
             if (step.duration_ms <= 2000) {
                 blockWidthPx = BLOCK_SIZE_SMALL_PX;
@@ -439,25 +517,23 @@ const removeStepButton = document.getElementById('remove-step-button');
                 blockWidthPx = BLOCK_SIZE_LARGE_PX;
             }
             // Add the margin-right of the block to the offset for the marker
-            currentPixelOffset += blockWidthPx + 5; // 5px is the margin-right
+            currentPixelOffset += blockWidthPx + 5; // 5px is the margin-right from stepBlock.style.marginRight
             actualCumulativeTime += step.duration_ms;
 
             const timeMarker = document.createElement('div');
-            timeMarker.className = 'timeline-time-marker';
+            timeMarker.className = 'timeline-time-marker'; // For filtering in Sortable and styling
             timeMarker.style.position = 'absolute';
-            // Position marker at the end of the current visual block
-            timeMarker.style.left = `${currentPixelOffset - 2}px`; // Adjust -2 for line thickness/centering
-            timeMarker.style.top = '-5px'; // Position above the blocks (adjust from timelineWrapper's padding-top)
-            timeMarker.style.height = '10px'; // Short line
+            timeMarker.style.left = `${currentPixelOffset - (blockWidthPx / 2) - 2}px`; // Attempt to center marker *between* blocks, or at end
+                                                                                     // Or more simply, at the end: `${currentPixelOffset - 2}px`
+            timeMarker.style.left = `${currentPixelOffset - 2.5}px`; // -2.5 to be roughly at the end of margin
+            timeMarker.style.top = '5px'; // Position above the blocks (relative to timelineWrapper's padding-top)
+            timeMarker.style.height = 'calc(100% + 10px)'; // Span height of wrapper + a bit more
             timeMarker.style.fontSize = '0.7em';
             timeMarker.style.borderLeft = '1px dotted #555';
             timeMarker.style.paddingLeft = '3px';
-            timeMarker.innerHTML = `${actualCumulativeTime}<span style="font-size:0.8em;">ms</span>`; // Display actual time
+            timeMarker.innerHTML = `${actualCumulativeTime}<span style="font-size:0.8em;">ms</span>`;
             timelineWrapper.appendChild(timeMarker);
         });
-
-
-        timelineDisplayDiv.appendChild(timelineWrapper);
     }
 
     const exportButton = document.getElementById('export-button');
@@ -637,6 +713,31 @@ const loadProgramButton = document.getElementById('load-program-button');
             applyTheme('light'); // Default to light
         }
     }
+
+
+    function updateLedProgramAppearance() {
+            // Ensure allLedButtons is available and populated before calling this
+            if (!allLedButtons || allLedButtons.length === 0) {
+                console.warn("allLedButtons array is not populated yet.");
+                return;
+            }
+
+            allLedButtons.forEach(btn => {
+                const ledId = parseInt(btn.dataset.ledId);
+                const ledKey = `LED${ledId}`;
+                // Check if the LED's program array has any steps
+                const hasProgram = programData[ledKey] && programData[ledKey].length > 0;
+
+                if (hasProgram) {
+                    btn.classList.add('has-program');
+                } else {
+                    btn.classList.remove('has-program');
+                }
+            });
+            console.log("LED program appearance updated.");
+        }
+
+
     console.log('Dark mode toggle initialized!');
     // Initial render on page load (will show "No LED selected" message)
     currentlyViewedLedIndex = ledId;
