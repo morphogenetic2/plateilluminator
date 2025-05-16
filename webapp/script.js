@@ -713,31 +713,6 @@ const loadProgramButton = document.getElementById('load-program-button');
             applyTheme('light'); // Default to light
         }
     }
-
-
-    function updateLedProgramAppearance() {
-            // Ensure allLedButtons is available and populated before calling this
-            if (!allLedButtons || allLedButtons.length === 0) {
-                console.warn("allLedButtons array is not populated yet.");
-                return;
-            }
-
-            allLedButtons.forEach(btn => {
-                const ledId = parseInt(btn.dataset.ledId);
-                const ledKey = `LED${ledId}`;
-                // Check if the LED's program array has any steps
-                const hasProgram = programData[ledKey] && programData[ledKey].length > 0;
-
-                if (hasProgram) {
-                    btn.classList.add('has-program');
-                } else {
-                    btn.classList.remove('has-program');
-                }
-            });
-            console.log("LED program appearance updated.");
-        }
-
-
     console.log('Dark mode toggle initialized!');
     // Initial render on page load (will show "No LED selected" message)
     currentlyViewedLedIndex = ledId;
