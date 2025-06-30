@@ -15,14 +15,23 @@ document.addEventListener('DOMContentLoaded', () => {
     let selectedLedIndices = new Set(); // Use a Set to store 0-based indices of selected LEDs
 
     // --- Helper function to update button appearance ---
-    function updateLedButtonAppearance(buttonElement, isSelected) {
-        if (isSelected) {
-            buttonElement.classList.remove('is-outlined');
-            buttonElement.classList.add('is-info'); // Or 'is-primary', 'is-success', etc.
-        } else {
-            buttonElement.classList.add('is-outlined');
-            buttonElement.classList.remove('is-info');
-        }
+    function updateAllLedButtonAppearances() {
+        allLedButtons.forEach(btn => {
+            const ledId = parseInt(btn.dataset.ledId);
+            const isSelected = selectedLedIndices.has(ledId);
+            const isCurrentlyViewed = (ledId === currentlyViewedLedIndex);
+
+            // Reset classes first
+            btn.classList.remove('is-info', 'is-success', 'is-outlined');
+
+            if (isCurrentlyViewed) {
+                btn.classList.add('is-success'); // Green for the timeline-active LED
+            } else if (isSelected) {
+                btn.classList.add('is-info'); // Blue for other selected LEDs
+            } else {
+                btn.classList.add('is-outlined'); // Default outlined for non-selected
+            }
+        });
     }
 
     // --- Create the LED Grid ---
@@ -46,26 +55,60 @@ document.addEventListener('DOMContentLoaded', () => {
         ledButton.dataset.ledId = i; // 0-based index
 
         // Event Listener for individual LED button clicks
-        ledButton.addEventListener('click', () => {
+        ledButton.addEventListener('click', (event) => {
             const ledId = parseInt(ledButton.dataset.ledId);
-            if (selectedLedIndices.has(ledId)) {
-                selectedLedIndices.delete(ledId);
-                updateLedButtonAppearance(ledButton, false);
-            } else {
-                selectedLedIndices.add(ledId);
-                updateLedButtonAppearance(ledButton, true);
-            }
-            currentlyViewedLedIndex = ledId; // <<< SET THE CURRENTLY VIEWED LED
+            const isCtrlClick = event.ctrlKey || event.metaKey; // metaKey for macOS Command
 
-            console.log("Selected LEDs:", Array.from(selectedLedIndices).sort((a,b)=>a-b) ); // Log selected IDs
-            renderTimeline();                 // <<< RENDER ITS TIMELINE
-            // Later: update timeline based on selection
+            if (isCtrlClick) {
+                // --- Multi-selection logic ---
+                if (selectedLedIndices.has(ledId)) {
+                    selectedLedIndices.delete(ledId);
+                } else {
+                    selectedLedIndices.add(ledId);
+                }
+            } else {
+                // --- Single-selection logic ---
+                // If the clicked LED is the only one selected, deselect it.
+                // Otherwise, clear the selection and select only the clicked LED.
+                if (selectedLedIndices.has(ledId) && selectedLedIndices.size === 1) {
+                    selectedLedIndices.clear();
+                } else {
+                    selectedLedIndices.clear();
+                    selectedLedIndices.add(ledId);
+                }
+            }
+
+            // Set the timeline to the most recently clicked LED
+            currentlyViewedLedIndex = ledId;
+
+            console.log("Selected LEDs:", Array.from(selectedLedIndices).sort((a,b)=>a-b));
+            updateAllLedButtonAppearances();
+            renderTimeline();
         });
 
         gridContainer.appendChild(ledButton);
         allLedButtons.push(ledButton); // Add to our array
     }
     ledSelectionBoxContent.appendChild(gridContainer);
+
+    // --- Helper function to update button appearance based on program existence ---
+    function updateLedProgramOutline(ledIndex) {
+        const ledButton = allLedButtons[ledIndex];
+        if (!ledButton) return;
+
+        const ledKey = `LED${ledIndex}`;
+        const hasProgram = programData[ledKey] && programData[ledKey].length > 0;
+
+        if (hasProgram) {
+            ledButton.classList.add('has-program');
+        } else {
+            ledButton.classList.remove('has-program');
+        }
+    }
+
+    function updateAllLedOutlines() {
+        allLedButtons.forEach((btn, index) => updateLedProgramOutline(index));
+    }
 
     // --- Create Select All / Select None buttons ---
         // ---- MODIFIED/NEW SECTION for action buttons in LED Selection ----
@@ -81,8 +124,8 @@ document.addEventListener('DOMContentLoaded', () => {
         allLedButtons.forEach(btn => {
             const ledId = parseInt(btn.dataset.ledId);
             selectedLedIndices.add(ledId);
-            updateLedButtonAppearance(btn, true);
         });
+        updateAllLedButtonAppearances();
         console.log("Selected LEDs:", Array.from(selectedLedIndices).sort((a,b)=>a-b) );
         // No timeline update needed here unless your logic changes
     });
@@ -95,10 +138,8 @@ document.addEventListener('DOMContentLoaded', () => {
     selectNoneButton.id = 'select-none-leds';
     selectNoneButton.textContent = 'Select None';
     selectNoneButton.addEventListener('click', () => {
-        allLedButtons.forEach(btn => {
-            updateLedButtonAppearance(btn, false);
-        });
         selectedLedIndices.clear();
+        updateAllLedButtonAppearances();
         console.log("Selected LEDs:", Array.from(selectedLedIndices).sort((a,b)=>a-b) );
         if (currentlyViewedLedIndex !== null && !selectedLedIndices.has(currentlyViewedLedIndex)) {
             // If the timeline LED is no longer selected, perhaps clear timeline or show "no selection"
@@ -132,6 +173,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (programData[ledKey] && programData[ledKey].length > 0) {
                 programData[ledKey] = []; // Reset the array of steps to empty
                 clearedAtLeastOne = true;
+                updateLedProgramOutline(ledIndex); // Update outline
             }
         });
 
@@ -315,6 +357,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     programData[`LED${ledIndex}`] = [];
                 }
                 programData[`LED${ledIndex}`].push(step);
+                updateLedProgramOutline(ledIndex); // Update outline
             });
 
             console.log("Updated programData (with validation):", JSON.parse(JSON.stringify(programData)));
@@ -342,6 +385,7 @@ const removeStepButton = document.getElementById('remove-step-button');
                 if (programData[ledKey] && programData[ledKey].length > 0) {
                     programData[ledKey].pop(); // .pop() removes the last element from an array
                     removedStepFromAtLeastOne = true;
+                    updateLedProgramOutline(ledIndex); // Update outline
                 }
             });
 
@@ -412,9 +456,9 @@ const removeStepButton = document.getElementById('remove-step-button');
         }
 
         // Define Block Sizes
-        const BLOCK_SIZE_SMALL_PX = 80;
-        const BLOCK_SIZE_MEDIUM_PX = 120;
-        const BLOCK_SIZE_LARGE_PX = 160;
+        const BLOCK_SIZE_SMALL_PX = 160; // Was 80
+        const BLOCK_SIZE_MEDIUM_PX = 240; // Was 120
+        const BLOCK_SIZE_LARGE_PX = 320; // Was 160
 
         const timelineWrapper = document.createElement('div');
         // Optional: Give it a unique ID if needed for complex scenarios, though destroying instance is primary
@@ -637,11 +681,9 @@ const loadProgramButton = document.getElementById('load-program-button');
                         //    For now, let's keep current selection, timeline will update for viewed LED.
                         // selectedLedIndices.clear(); // Optional: clear selection
                         // allLedButtons.forEach(btn => updateLedButtonAppearance(btn, false)); // Optional: update UI
-
-                        // 2. Update the timeline for the currently viewed LED (if any)
                         renderTimeline();
-
-                        // 3. (Future) If you were saving/loading LED selection states, update those too.
+                        updateAllLedOutlines();
+                        // (Future) If you were saving/loading LED selection states, update those too.
 
                     } catch (error) {
                         console.error("Error loading or parsing program.json:", error);
@@ -715,7 +757,6 @@ const loadProgramButton = document.getElementById('load-program-button');
     }
     console.log('Dark mode toggle initialized!');
     // Initial render on page load (will show "No LED selected" message)
-    currentlyViewedLedIndex = ledId;
     renderTimeline();
     console.log('Timeline rendering initialized!');
 });
