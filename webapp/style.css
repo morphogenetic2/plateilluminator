@@ -15,8 +15,20 @@
     text-align: center;
     box-sizing: border-box;
     position: relative;
-    word-break: break-word; /* Helps with text fitting */
-    /* margin-right: 5px; /* Now set in JS for consistent spacing with markers */
+    word-break: break-word;
+    border-radius: 4px;
+    cursor: grab;
+    transition: transform 0.1s ease;
+    box-shadow: 0 2px 3px rgba(0,0,0,0.1);
+}
+
+.timeline-step-block:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+}
+
+.timeline-step-block:active {
+    cursor: grabbing;
 }
 
 .timeline-time-marker {

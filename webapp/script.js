@@ -621,7 +621,16 @@ const removeStepButton = document.getElementById('remove-step-button');
                 URL.revokeObjectURL(a.href);
 
                 console.log("program.json exported.");
-                alert("program.json has been prepared for download!");
+                // Show success feedback
+                exportButton.classList.remove('is-primary');
+                exportButton.classList.add('is-success');
+                exportButton.innerHTML = '<span class="icon is-small"><i class="fas fa-check"></i></span><span>Download Ready!</span>';
+                        
+                setTimeout(() => {
+                    exportButton.classList.remove('is-success');
+                    exportButton.classList.add('is-primary');
+                    exportButton.innerHTML = '<span class="icon is-small"><i class="fas fa-download"></i></span><span>Export program.json</span>';
+                }, 3000);
             });
         }
 
