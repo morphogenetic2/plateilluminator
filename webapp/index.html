@@ -10,30 +10,10 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script> <!-- Add SortableJS -->
     <style>
         /* Style for LED buttons that have a program */
-        .led-button {
-            transition: all 0.2s ease;
-            font-weight: 600;
-        }
-
         .led-button.has-program {
-            box-shadow: 0 0 0 2px #3273dc;
-            position: relative;
-        }
-
-        .led-button.has-program::after {
-            content: '•';
-            position: absolute;
-            top: -5px;
-            right: -5px;
-            color: #3273dc;
-            font-size: 1.5em;
-            text-shadow: 0 0 3px white;
-        }
-
-        .led-button.is-active {
-            transform: scale(1.05);
-            box-shadow: 0 0 0 3px #48c774;
-            z-index: 1;
+            /* Using a prominent color for the outline. You can adjust this. */
+            outline: 2px solid #3273dc; /* Bulma's primary blue color */
+            outline-offset: 2px;
         }
     </style>
     <script src="script.js"></script>
@@ -69,14 +49,6 @@
                 <!-- Right Pane: Step Editor -->
                 <div class="column is-two-thirds" id="step-editor-pane">
                     <div class="box">
-                        <div class="has-text-centered mb Using this modeling approach is particularly useful in situations where the extent of a contamination plume is poorly defined, or when the subsurface property values are not well characterized. 
-.
-                        </div>
-                        <div class="has-text-centered mb-4">
-                            <div class="tags are-medium">
-                                <span class="tag is-warning is-light" id="active-leds-count">0 LEDs selected</span>
-                            </div>
-                        </div>
                         <h2 class="title is-4 has-text-centered">Step Editor</h2>
                         <!-- Step Type Dropdown -->
                         <div class="field">
@@ -208,20 +180,3 @@
     
 </body>
 </html>
-    <!-- Confirmation Modal -->
-    <div class="modal" id="confirm-modal">
-        <div class="modal-background"></div>
-        <div class="modal-card">
-            <header class="modal-card-head">
-                <p class="modal-card-title">Confirm Action</p>
-                <button class="delete" aria-label="close"></button>
-            </header>
-            <section class="modal-card-body">
-                <p id="confirm-message">Are you sure you want to perform this action?</p>
-            </section>
-            <footer class="modal-card-foot">
-                <button class="button is-danger" id="confirm-action">Confirm</button>
-                <button class="button" id="cancel-action">Cancel</button>
-            </footer>
-        </div>
-    </div>
