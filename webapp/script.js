@@ -704,6 +704,46 @@ const loadProgramButton = document.getElementById('load-program-button');
             }
         });
     }
+    // --- Copy Program Function ---
+    function handleCopyProgram() {
+        if (selectedLedIndices.size < 2) {
+            alert("Please select at least 2 LEDs (source + targets)");
+            return;
+        }
+        
+        // Get the last selected LED as source (using Array.from gives insertion order)
+        const selectedArray = Array.from(selectedLedIndices);
+        const sourceLedIndex = selectedArray[selectedArray.length - 1];
+        const sourceProgram = programData[`LED${sourceLedIndex}`];
+        
+        if (!sourceProgram || sourceProgram.length === 0) {
+            alert("Source LED has no program to copy");
+            return;
+        }
+
+        // Clone the program for each selected LED (excluding source)
+        selectedArray.forEach(ledIndex => {
+            if (ledIndex !== sourceLedIndex) {
+                programData[`LED${ledIndex}`] = JSON.parse(JSON.stringify(sourceProgram));
+                updateLedProgramOutline(ledIndex);
+            }
+        });
+
+        // Show notification
+        const notification = document.createElement('div');
+        notification.className = 'notification is-info is-light';
+        notification.textContent = `Program copied from LED ${sourceLedIndex + 1} to ${selectedIndices.size - 1} LED(s)`;
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
+
+        // Refresh timeline if viewing one of the target LEDs
+        if (currentlyViewedLedIndex !== null && selectedLedIndices.has(currentlyViewedLedIndex) && currentlyViewedLedIndex !== sourceLedIndex) {
+            renderTimeline();
+        }
+    }
+
+    console.log('Copy Program button initialized!');
+
     console.log('Load Program button initialized!');
     // --- Dark Mode Toggle Logic ---
     const darkModeToggleButton = document.getElementById('darkModeToggle');
