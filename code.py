@@ -11,7 +11,7 @@ import adafruit_tlc5947
 # Constants
 # -----------------------
 NUM_CHANNELS = 24  # Number of TLC5947 channels (24 LEDs)
-TICK_MS = 50  # 50 ms update period. The whole plate takes 42 ms to update, so the tick needs to be larger than 42 ms. 50 ms is the minimum time that will keep accuracy in the programs.
+TICK_MS = 10000  # 50 ms update period. The whole plate takes 42 ms to update, so the tick needs to be larger than 42 ms. 50 ms is the minimum time that will keep accuracy in the programs. Longer ticks can be used for "stable programs" where there is no need for fast transitions.
 SLEEP = 0.001 # time sleep in seconds to avoid CPU overload.
 
 # -----------------------
