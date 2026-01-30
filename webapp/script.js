@@ -479,29 +479,40 @@ document.addEventListener('DOMContentLoaded', () => {
         timelineWrapper.style.paddingTop = '25px'; // Space for time markers above
 
         steps.forEach((step, originalIndex) => {
+            // Main Container (Draggable)
             const stepBlock = document.createElement('div');
             stepBlock.className = 'timeline-step-block draggable-step';
             stepBlock.dataset.stepOriginalIndex = originalIndex;
 
-            // Fixed dimensions
+            // Dimensions logic
             const BLOCK_HEIGHT = 80;
             let blockWidth;
             if (step.duration_ms <= 2000) {
-                blockWidth = BLOCK_SIZE_SMALL_PX;
+                blockWidth = BLOCK_SIZE_SMALL_PX; // 160
             } else if (step.duration_ms <= 5000) {
-                blockWidth = BLOCK_SIZE_MEDIUM_PX;
+                blockWidth = BLOCK_SIZE_MEDIUM_PX; // 240
             } else {
-                blockWidth = BLOCK_SIZE_LARGE_PX;
+                blockWidth = BLOCK_SIZE_LARGE_PX; // 320
             }
 
-            // Container styling with EXPLICIT dimensions
+            // Container Styling: Column Layout
             stepBlock.style.width = blockWidth + 'px';
-            stepBlock.style.height = BLOCK_HEIGHT + 'px';
-            stepBlock.style.border = '1px solid #ccc';
+            stepBlock.style.display = 'flex';
+            stepBlock.style.flexDirection = 'column'; // Vertical stack
             stepBlock.style.marginRight = '5px';
             stepBlock.style.position = 'relative';
-            stepBlock.style.backgroundColor = '#fafafa';
             stepBlock.style.boxSizing = 'border-box';
+            // Note: Border/Background moved to visualBlock
+
+            // --- 1. Visual Block (Top) ---
+            const visualBlock = document.createElement('div');
+            visualBlock.style.width = '100%';
+            visualBlock.style.height = BLOCK_HEIGHT + 'px';
+            visualBlock.style.border = '1px solid #ccc';
+            visualBlock.style.backgroundColor = '#fafafa';
+            visualBlock.style.position = 'relative'; // For SVG absolute positioning
+            visualBlock.style.boxSizing = 'border-box';
+            visualBlock.style.cursor = 'grab'; // Visual cue for dragging
 
             // Create SVG with explicit pixel dimensions
             const SVG_NS = "http://www.w3.org/2000/svg";
@@ -604,9 +615,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 desc = "SINE: " + step.int0 + "~" + step.int1;
             }
 
-            stepBlock.appendChild(svg);
+            visualBlock.appendChild(svg);
 
-            // Text overlay at bottom
+            // Text overlay at bottom of visual block
             const label = document.createElement('div');
             label.style.position = 'absolute';
             label.style.bottom = '2px';
@@ -616,11 +627,55 @@ document.addEventListener('DOMContentLoaded', () => {
             label.style.pointerEvents = 'none';
             label.style.whiteSpace = 'nowrap';
             label.textContent = desc + " (" + step.duration_ms + "ms)";
-            stepBlock.appendChild(label);
+            visualBlock.appendChild(label);
 
-            // Tooltip
+            stepBlock.appendChild(visualBlock);
+
+
+            // --- 2. Controls Block (Bottom) ---
+            const controlsBlock = document.createElement('div');
+            controlsBlock.style.width = '100%';
+            controlsBlock.style.height = '24px';
+            controlsBlock.style.display = 'flex';
+            controlsBlock.style.justifyContent = 'center'; // Center the button
+            controlsBlock.style.alignItems = 'center';
+            controlsBlock.style.backgroundColor = 'transparent'; // Clean look
+
+            // Tooltip for the whole step block
             stepBlock.title = desc + "\nDuration: " + step.duration_ms + "ms";
 
+            // Delete Button
+            const deleteBtn = document.createElement('div');
+            deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+            deleteBtn.style.cursor = 'pointer';
+            deleteBtn.style.color = '#999';
+            deleteBtn.style.fontSize = '12px';
+            deleteBtn.title = 'Delete this step';
+
+            // Hover effects
+            deleteBtn.addEventListener('mouseenter', () => deleteBtn.style.color = '#ff3860');
+            deleteBtn.addEventListener('mouseleave', () => deleteBtn.style.color = '#999');
+
+            // Click handler
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation(); // Prevent drag
+
+                // Remove step
+                const currentLedKey = `LED${currentlyViewedLedIndex}`;
+                if (programData[currentLedKey]) {
+                    programData[currentLedKey].splice(originalIndex, 1);
+                    console.log(`Deleted step at index ${originalIndex}`);
+
+                    // Update UI
+                    renderTimeline();
+                    updateLedProgramOutline(currentlyViewedLedIndex);
+                }
+            });
+
+            controlsBlock.appendChild(deleteBtn);
+            stepBlock.appendChild(controlsBlock);
+
+            // Append to main wrapper
             timelineWrapper.appendChild(stepBlock);
         });
 
