@@ -1,0 +1,219 @@
+{
+  "LED0": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED1": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED2": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED3": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED4": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED5": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED6": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED7": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED8": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED9": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED10": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED11": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED12": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED13": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED14": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED15": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED16": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED17": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED18": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED19": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED20": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED21": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED22": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "LED23": [
+    {
+      "type": "SINE",
+      "duration_ms": 10000,
+      "int0": 0,
+      "int1": 1000,
+      "freq": 5
+    }
+  ],
+  "total_duration_minutes": 1
+}

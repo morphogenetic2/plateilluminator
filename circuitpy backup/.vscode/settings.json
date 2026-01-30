@@ -1,0 +1,17 @@
+{
+    "python.languageServer": "Pylance",
+    "python.analysis.diagnosticSeverityOverrides": {
+        "reportMissingModuleSource": "none",
+        "reportShadowedImports": "none"
+    },
+    "circuitpython.board.version": "7.3.3",
+    "python.analysis.extraPaths": [
+        "c:\\Users\\denov\\.vscode\\extensions\\wmerkens.vscode-circuitpython-v2-0.3.0\\boards\\0x239A\\0x8026",
+        "c:\\Users\\denov\\.vscode\\extensions\\wmerkens.vscode-circuitpython-v2-0.3.0\\stubs",
+        ""
+    ],
+    "circuitpython.board.vid": "0x239A",
+    "circuitpython.board.pid": "0x8026",
+    "python.analysis.typeCheckingMode": "standard",
+    "python.analysis.autoImportCompletions": true
+}
