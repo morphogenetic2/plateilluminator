@@ -181,9 +181,6 @@ void loop() {
   if (elapsed >= TICK_MS) {
     lastUpdate = now;
 
-    // Start timing the update cycle
-    unsigned long updateStart = micros();
-
     // Check global timeout
     if (!experimentFinished && totalDurationMinutes > 0) {
       unsigned long totalElapsedMs = now - experimentStartTime;
@@ -213,21 +210,5 @@ void loop() {
 
     // Write all PWM values to hardware
     tlc.write();
-
-    // Calculate update cycle time
-    unsigned long updateTime = micros() - updateStart;
-
-    // Print timing stats every 5 seconds
-    static unsigned long lastPrint = 0;
-    if (now - lastPrint >= 5000) {
-      lastPrint = now;
-      Serial.print("Update cycle: ");
-      Serial.print(updateTime / 1000.0f, 2);
-      Serial.print(" ms | Target TICK: ");
-      Serial.print(TICK_MS);
-      Serial.print(" ms | Actual interval: ");
-      Serial.print(elapsed);
-      Serial.println(" ms");
-    }
   }
 }

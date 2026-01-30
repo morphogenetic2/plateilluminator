@@ -24,7 +24,8 @@ LATCH_PIN.direction = digitalio.Direction.OUTPUT
 
 # Create SPI bus and TLC5947 object
 spi = busio.SPI(clock=SCK, MOSI=MOSI)
-led = adafruit_tlc5947.TLC5947(spi, LATCH_PIN)
+led = adafruit_tlc5947.TLC5947(spi, LATCH_PIN, auto_write=False)  # Disable auto-write to prevent flicker
+
 
 # -----------------------
 # Load Calibration Data
@@ -153,8 +154,9 @@ if animation_led_count > 0:
     TICK_MS = max(5, calculated_tick)
     print(f"Dynamic TICK: Found {animation_led_count} LEDs with RAMP/SINE. Setting TICK_MS = {TICK_MS}")
 elif min_duration != float("inf"):
-    # Static program: use step duration as tick (min 50ms for stability)
-    TICK_MS = max(50, int(min_duration))
+    # Static program: use step duration as tick (min 50ms, max 1000ms)
+    tick_candidate = max(50, int(min_duration))
+    TICK_MS = min(tick_candidate, 1000)  # Cap at 1 second for responsiveness
     print(f"Dynamic TICK: Static program. Setting TICK_MS = {TICK_MS}")
 else:
     TICK_MS = 50  # Default safe fallback
@@ -197,6 +199,9 @@ while True:
                  uw_intensity = led_programs[i].update(elapsed)  # µW/cm²
             
             led[i] = uw_cm2_to_pwm(uw_intensity, i)  # Set PWM directly (12-bit)
+        
+        # Write all PWM values to hardware in one batch (prevents flicker)
+        led.write()
 
     # Small sleep to avoid high CPU usage
     time.sleep(SLEEP)
