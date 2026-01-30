@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,17 +8,20 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script> <!-- Add SortableJS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <!-- Add SortableJS -->
     <style>
         /* Style for LED buttons that have a program */
         .led-button.has-program {
             /* Using a prominent color for the outline. You can adjust this. */
-            outline: 2px solid #3273dc; /* Bulma's primary blue color */
+            outline: 2px solid #3273dc;
+            /* Bulma's primary blue color */
             outline-offset: 2px;
         }
     </style>
     <script src="script.js"></script>
 </head>
+
 <body>
 
     <section class="section">
@@ -26,25 +30,25 @@
             <p class="subtitle has-text-centered">
                 Design programs for your 24-channel LED illuminator!
             </p>
-             <!-- Add Dark Mode Toggle Button Here -->
+            <!-- Add Dark Mode Toggle Button Here -->
             <div class="has-text-centered mb-4"> <!-- Centering wrapper with margin-bottom -->
-            <button class="button" id="darkModeToggle">
-                <span class="icon"><i class="fas fa-moon"></i></span>
-                <span>Toggle Dark Mode</span>
-            </button>
-        </div>
+                <button class="button" id="darkModeToggle">
+                    <span class="icon"><i class="fas fa-moon"></i></span>
+                    <span>Toggle Dark Mode</span>
+                </button>
+            </div>
             <hr>
 
             <!-- ROW 1: LED Selection and Step Editor -->
             <div class="columns">
                 <!-- Left Pane: LED Grid -->
                 <div class="column is-one-third" id="led-grid-pane">
-                        <div class="box">
-                            <h2 class="title is-4 has-text-centered">LED Selection</h2>
-                            <!-- JavaScript will add LED grid here -->
-                            <!-- selectActionsContainer will be created by JS -->
-                        </div>
+                    <div class="box">
+                        <h2 class="title is-4 has-text-centered">LED Selection</h2>
+                        <!-- JavaScript will add LED grid here -->
+                        <!-- selectActionsContainer will be created by JS -->
                     </div>
+                </div>
 
                 <!-- Right Pane: Step Editor -->
                 <div class="column is-two-thirds" id="step-editor-pane">
@@ -54,67 +58,92 @@
                         <div class="field">
                             <label class="label">Step Type</label>
                             <div class="control">
-                                <div class="select is-fullwidth">
-                                    <select id="step-type">
-                                        <option value="ON">ON (Constant)</option>
-                                        <option value="OFF">OFF</option>
-                                        <option value="RAMP">RAMP</option>
-                                        <option value="SINE">SINE</option>
-                                    </select>
+                                <div class="buttons has-addons is-centered" id="step-type-buttons">
+                                    <button class="button step-type-btn is-selected is-info" data-value="ON"
+                                        title="Constant ON">
+                                        <span class="icon"><i class="fas fa-lightbulb"></i></span>
+                                        <span>ON</span>
+                                    </button>
+                                    <button class="button step-type-btn" data-value="OFF" title="Turn OFF">
+                                        <span class="icon"><i class="fas fa-power-off"></i></span>
+                                        <span>OFF</span>
+                                    </button>
+                                    <button class="button step-type-btn" data-value="RAMP" title="Linear Ramp">
+                                        <span class="icon"><i class="fas fa-chart-line"></i></span>
+                                        <span>RAMP</span>
+                                    </button>
+                                    <button class="button step-type-btn" data-value="SINE" title="Sinusoidal Wave">
+                                        <span class="icon"><i class="fas fa-wave-square"></i></span>
+                                        <span>SINE</span>
+                                    </button>
                                 </div>
                             </div>
                         </div>
                         <!-- Parameter fields for ON type -->
                         <div id="params-on" class="step-params field-group">
                             <div class="field">
-                                <label class="label">Intensity (int) <span class="has-text-weight-normal is-size-7">µW/cm²</span></label>
+                                <label class="label">Intensity (int) <span
+                                        class="has-text-weight-normal is-size-7">µW/cm²</span></label>
                                 <div class="control">
-                                    <input id="on-int" class="input" type="number" placeholder="e.g., 1000" min="0" value="1000">
+                                    <input id="on-int" class="input" type="number" placeholder="e.g., 1000" min="0"
+                                        value="1000">
                                 </div>
                             </div>
                         </div>
                         <!-- Parameter fields for RAMP type (initially hidden) -->
                         <div id="params-ramp" class="step-params field-group" style="display:none;">
                             <div class="field">
-                                <label class="label">Start Intensity (int0) <span class="has-text-weight-normal is-size-7">µW/cm²</span></label>
+                                <label class="label">Start Intensity (int0) <span
+                                        class="has-text-weight-normal is-size-7">µW/cm²</span></label>
                                 <div class="control">
-                                    <input id="ramp-int0" class="input" type="number" placeholder="e.g., 0" min="0" value="0">
+                                    <input id="ramp-int0" class="input" type="number" placeholder="e.g., 0" min="0"
+                                        value="0">
                                 </div>
                             </div>
                             <div class="field">
-                                <label class="label">End Intensity (int1) <span class="has-text-weight-normal is-size-7">µW/cm²</span></label>
+                                <label class="label">End Intensity (int1) <span
+                                        class="has-text-weight-normal is-size-7">µW/cm²</span></label>
                                 <div class="control">
-                                    <input id="ramp-int1" class="input" type="number" placeholder="e.g., 1000" min="0" value="1000">
+                                    <input id="ramp-int1" class="input" type="number" placeholder="e.g., 1000" min="0"
+                                        value="1000">
                                 </div>
                             </div>
                         </div>
                         <!-- Parameter fields for SINE type (initially hidden) -->
                         <div id="params-sine" class="step-params field-group" style="display:none;">
                             <div class="field">
-                                <label class="label">Min Intensity (int0) <span class="has-text-weight-normal is-size-7">µW/cm²</span></label>
+                                <label class="label">Min Intensity (int0) <span
+                                        class="has-text-weight-normal is-size-7">µW/cm²</span></label>
                                 <div class="control">
-                                    <input id="sine-int0" class="input" type="number" placeholder="e.g., 100" min="0" value="100">
+                                    <input id="sine-int0" class="input" type="number" placeholder="e.g., 100" min="0"
+                                        value="100">
                                 </div>
                             </div>
                             <div class="field">
-                                <label class="label">Max Intensity (int1) <span class="has-text-weight-normal is-size-7">µW/cm²</span></label>
+                                <label class="label">Max Intensity (int1) <span
+                                        class="has-text-weight-normal is-size-7">µW/cm²</span></label>
                                 <div class="control">
-                                    <input id="sine-int1" class="input" type="number" placeholder="e.g., 800" min="0" value="800">
+                                    <input id="sine-int1" class="input" type="number" placeholder="e.g., 800" min="0"
+                                        value="800">
                                 </div>
                             </div>
                             <div class="field">
-                                <label class="label">Frequency (freq) <span class="has-text-weight-normal is-size-7">Hz</span></label>
+                                <label class="label">Frequency (freq) <span class="has-text-weight-normal is-size-7">Hz
+                                        (Max 20)</span></label>
                                 <div class="control">
-                                    <input id="sine-freq" class="input" type="number" placeholder="e.g., 1.0" step="0.1" min="0" value="1.0">
+                                    <input id="sine-freq" class="input" type="number" placeholder="e.g., 1.0" step="0.1"
+                                        min="0" value="1.0">
                                 </div>
                             </div>
                         </div>
                         <!-- Common field: Duration (always visible for ON, RAMP, SINE) -->
                         <div id="params-duration" class="field-group">
                             <div class="field">
-                                <label class="label">Duration <span class="has-text-weight-normal is-size-7">ms</span></label>
+                                <label class="label">Duration <span
+                                        class="has-text-weight-normal is-size-7">ms</span></label>
                                 <div class="control">
-                                    <input id="step-duration" class="input" type="number" placeholder="e.g., 1000" min="0" value="1000">
+                                    <input id="step-duration" class="input" type="number" placeholder="e.g., 1000"
+                                        min="0" value="1000">
                                 </div>
                             </div>
                         </div>
@@ -132,20 +161,21 @@
             </div> <!-- END OF ROW 1 -->
 
             <!-- ROW 2: Program Timeline -->
-                <div class="columns">
-                    <div class="column">
-                        <div class="box" id="timeline-pane"> <!-- id="timeline-pane" is on the box -->
-                             <h3 class="title is-4 has-text-centered">
-                                Program Timeline (<span id="timeline-led-label">No LED Selected</span>)
-                             </h3>
-                             <div id="timeline-display" style="border: 1px solid #ccc; min-height: 150px; position: relative; overflow-x: auto; background-color: white;">
-                                <!-- JS will clear this and add timeline blocks -->
-                                <p class="has-text-centered has-text-grey p-4">Select an LED to see its program.</p>
-                            </div>
+            <div class="columns">
+                <div class="column">
+                    <div class="box" id="timeline-pane"> <!-- id="timeline-pane" is on the box -->
+                        <h3 class="title is-4 has-text-centered">
+                            Program Timeline (<span id="timeline-led-label">No LED Selected</span>)
+                        </h3>
+                        <div id="timeline-display"
+                            style="border: 1px solid #ccc; min-height: 150px; position: relative; overflow-x: auto; background-color: white;">
+                            <!-- JS will clear this and add timeline blocks -->
+                            <p class="has-text-centered has-text-grey p-4">Select an LED to see its program.</p>
                         </div>
                     </div>
                 </div>
-                <!-- END OF ROW 2 -->
+            </div>
+            <!-- END OF ROW 2 -->
 
             <!-- ROW 3: Load and Export Buttons -->
             <div class="columns is-centered"> <!-- is-centered for the column group -->
@@ -165,8 +195,8 @@
                     </div>
                 </div>
                 <div class="column is-narrow">
-                     <button class="button is-primary is-fullwidth" id="export-button">
-                         <span class="icon is-small">
+                    <button class="button is-primary is-fullwidth" id="export-button">
+                        <span class="icon is-small">
                             <i class="fas fa-download"></i> <!-- Font Awesome icon -->
                         </span>
                         <span>Export program.json</span>
@@ -174,9 +204,24 @@
                 </div>
             </div> <!-- END OF ROW 3 -->
 
+            <!-- Global Settings Row -->
+            <div class="columns is-centered mt-4">
+                <div class="column is-one-third">
+                    <div class="field">
+                        <label class="label has-text-centered">Total Run Time (minutes)</label>
+                        <div class="control">
+                            <input id="total-duration" class="input has-text-centered" type="number"
+                                placeholder="e.g. 300 (0 for infinite)" min="0">
+                        </div>
+                        <p class="help has-text-centered">Set to 0 or leave empty for no time limit.</p>
+                    </div>
+                </div>
+            </div>
+
         </div> <!-- End of container is-fluid -->
     </section>
 
-    
+
 </body>
+
 </html>

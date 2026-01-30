@@ -81,7 +81,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Set the timeline to the most recently clicked LED
             currentlyViewedLedIndex = ledId;
 
-            console.log("Selected LEDs:", Array.from(selectedLedIndices).sort((a,b)=>a-b));
+            console.log("Selected LEDs:", Array.from(selectedLedIndices).sort((a, b) => a - b));
             updateAllLedButtonAppearances();
             renderTimeline();
         });
@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Create Select All / Select None buttons ---
-        // ---- MODIFIED/NEW SECTION for action buttons in LED Selection ----
+    // ---- MODIFIED/NEW SECTION for action buttons in LED Selection ----
     const ledActionsContainer = document.createElement('div');
     ledActionsContainer.className = 'field is-grouped is-grouped-multiline mt-4'; // For better wrapping if needed
 
@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
             selectedLedIndices.add(ledId);
         });
         updateAllLedButtonAppearances();
-        console.log("Selected LEDs:", Array.from(selectedLedIndices).sort((a,b)=>a-b) );
+        console.log("Selected LEDs:", Array.from(selectedLedIndices).sort((a, b) => a - b));
         // No timeline update needed here unless your logic changes
     });
     ledActionsContainer.appendChild(selectAllButton);
@@ -140,7 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
     selectNoneButton.addEventListener('click', () => {
         selectedLedIndices.clear();
         updateAllLedButtonAppearances();
-        console.log("Selected LEDs:", Array.from(selectedLedIndices).sort((a,b)=>a-b) );
+        console.log("Selected LEDs:", Array.from(selectedLedIndices).sort((a, b) => a - b));
         if (currentlyViewedLedIndex !== null && !selectedLedIndices.has(currentlyViewedLedIndex)) {
             // If the timeline LED is no longer selected, perhaps clear timeline or show "no selection"
             // For now, timeline stays on the last explicitly clicked LED.
@@ -195,26 +195,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     console.log('LED Grid interaction enabled!');
 
-    // --- Step Editor Logic ---
-    const stepTypeSelect = document.getElementById('step-type');
+    // --- Step Editor Logic (Icon Buttons) ---
+    let currentStepType = 'ON'; // Default selected type
+    const stepTypeButtons = document.querySelectorAll('.step-type-btn');
     const paramsOnDiv = document.getElementById('params-on');
     const paramsRampDiv = document.getElementById('params-ramp');
     const paramsSineDiv = document.getElementById('params-sine');
-    const paramsDurationDiv = document.getElementById('params-duration'); // Get the duration field group
+    const paramsDurationDiv = document.getElementById('params-duration');
 
     // Store all parameter divs in an array for easy iteration
     const allParamDivs = [paramsOnDiv, paramsRampDiv, paramsSineDiv];
 
     function updateStepEditorForm() {
-        const selectedType = stepTypeSelect.value;
+        const selectedType = currentStepType;
 
         // Hide all specific parameter divs first
         allParamDivs.forEach(div => {
             if (div) div.style.display = 'none';
         });
-        // Always show duration for now, will refine for OFF type
+        // Always show duration
         if (paramsDurationDiv) paramsDurationDiv.style.display = 'block';
-
 
         // Show the relevant div based on selected type
         if (selectedType === 'ON') {
@@ -224,22 +224,31 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (selectedType === 'SINE') {
             if (paramsSineDiv) paramsSineDiv.style.display = 'block';
         } else if (selectedType === 'OFF') {
-            // For OFF, we might not need any specific params, and duration is still relevant.
-            // Or hide duration if OFF steps have no duration in your system?
-            // For now, OFF shows only duration.
-            if (paramsDurationDiv) paramsDurationDiv.style.display = 'block'; // Ensure duration is visible
+            if (paramsDurationDiv) paramsDurationDiv.style.display = 'block';
         }
     }
 
-    // Add event listener to the step type dropdown
-    if (stepTypeSelect) {
-        stepTypeSelect.addEventListener('change', updateStepEditorForm);
-    }
+    // Add event listeners to the step type buttons
+    stepTypeButtons.forEach(btn => {
+        btn.addEventListener('click', () => {
+            // Update state
+            currentStepType = btn.dataset.value;
 
-    // Call it once on page load to set the initial state based on the default dropdown value
+            // Update Visuals
+            stepTypeButtons.forEach(b => {
+                b.classList.remove('is-selected', 'is-info');
+            });
+            btn.classList.add('is-selected', 'is-info');
+
+            // Update Form Visibility
+            updateStepEditorForm();
+        });
+    });
+
+    // Call it once on page load
     updateStepEditorForm();
 
-    console.log('Step Editor form initialized!');
+    console.log('Step Editor form initialized (Icon Buttons)!');
 
     // --- Program Data Structure ---
     let programData = {}; // Stores the program for all LEDs
@@ -264,9 +273,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const stepDurationInput = document.getElementById('step-duration');
 
 
-        if (addStepButton) {
+    if (addStepButton) {
         addStepButton.addEventListener('click', () => {
-            const type = stepTypeSelect.value;
+            const type = currentStepType;
             let durationMs = parseInt(stepDurationInput.value);
 
             // --- Get references to input fields (already defined outside this listener) ---
@@ -309,6 +318,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 let numValue = parseFloat(value);
                 if (isNaN(numValue)) numValue = 0;
                 if (numValue < 0) return 0;
+                if (numValue > 20) return 20; // Max 20 Hz (1000ms / 50ms TICK)
                 return numValue;
             }
 
@@ -341,9 +351,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     // Optional: Ensure int0 <= int1 for SINE/RAMP if that's a logical requirement
                     if (step.int0 > step.int1 && (type === 'SINE' || type === 'RAMP')) {
-                            // Swap them or alert, for now, let's just note it.
-                            // console.warn(`${type}: int0 (${step.int0}) is greater than int1 (${step.int1}). Consider handling this.`);
-                            // For simplicity, we'll allow it, Python script might handle it or user needs to be aware
+                        // Swap them or alert, for now, let's just note it.
+                        // console.warn(`${type}: int0 (${step.int0}) is greater than int1 (${step.int1}). Consider handling this.`);
+                        // For simplicity, we'll allow it, Python script might handle it or user needs to be aware
                     }
                     break;
                 case 'OFF':
@@ -369,7 +379,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-const removeStepButton = document.getElementById('remove-step-button');
+    const removeStepButton = document.getElementById('remove-step-button');
 
     if (removeStepButton) {
         removeStepButton.addEventListener('click', () => {
@@ -379,7 +389,7 @@ const removeStepButton = document.getElementById('remove-step-button');
             }
 
             let
-             removedStepFromAtLeastOne = false;
+                removedStepFromAtLeastOne = false;
             selectedLedIndices.forEach(ledIndex => {
                 const ledKey = `LED${ledIndex}`;
                 if (programData[ledKey] && programData[ledKey].length > 0) {
@@ -402,7 +412,7 @@ const removeStepButton = document.getElementById('remove-step-button');
 
     console.log('Remove Step button initialized!'); // Add this new log
 
-    
+
     const timelineDisplayDiv = document.getElementById('timeline-display');
     const timelineLedLabel = document.getElementById('timeline-led-label'); // Get the span for the label
 
@@ -410,7 +420,7 @@ const removeStepButton = document.getElementById('remove-step-button');
     let currentlyViewedLedIndex = null; // 0-based index
 
     // --- Function to update the timeline display ---
-        // --- Function to update the timeline display ---
+    // --- Function to update the timeline display ---
     // Ensure 'timelineSortableInstance' is declared outside this function, e.g., let timelineSortableInstance = null;
     // Ensure 'programData', 'currentlyViewedLedIndex', 'timelineDisplayDiv', 'timelineLedLabel' are accessible in this scope.
 
@@ -568,7 +578,7 @@ const removeStepButton = document.getElementById('remove-step-button');
             timeMarker.className = 'timeline-time-marker'; // For filtering in Sortable and styling
             timeMarker.style.position = 'absolute';
             timeMarker.style.left = `${currentPixelOffset - (blockWidthPx / 2) - 2}px`; // Attempt to center marker *between* blocks, or at end
-                                                                                     // Or more simply, at the end: `${currentPixelOffset - 2}px`
+            // Or more simply, at the end: `${currentPixelOffset - 2}px`
             timeMarker.style.left = `${currentPixelOffset - 2.5}px`; // -2.5 to be roughly at the end of margin
             timeMarker.style.top = '5px'; // Position above the blocks (relative to timelineWrapper's padding-top)
             timeMarker.style.height = 'calc(100% + 10px)'; // Span height of wrapper + a bit more
@@ -582,52 +592,52 @@ const removeStepButton = document.getElementById('remove-step-button');
 
     const exportButton = document.getElementById('export-button');
 
-        if (exportButton) {
-            exportButton.addEventListener('click', () => {
-                // Check if there's anything to export
-                let hasAnySteps = false;
-                for (const ledKey in programData) {
-                    if (programData[ledKey].length > 0) {
-                        hasAnySteps = true;
-                        break;
-                    }
+    if (exportButton) {
+        exportButton.addEventListener('click', () => {
+            // Check if there's anything to export
+            let hasAnySteps = false;
+            for (const ledKey in programData) {
+                if (programData[ledKey].length > 0) {
+                    hasAnySteps = true;
+                    break;
                 }
+            }
 
-                if (!hasAnySteps) {
-                    alert("The program is empty. Add some steps before exporting.");
-                    return;
-                }
+            if (!hasAnySteps) {
+                alert("The program is empty. Add some steps before exporting.");
+                return;
+            }
 
-                // The programData should already be in the correct format:
-                // { "LED0": [...steps...], "LED1": [...steps...], ... }
-                // Convert the programData object to a JSON string
-                // The 'null, 2' arguments pretty-print the JSON with an indent of 2 spaces
-                const jsonString = JSON.stringify(programData, null, 2);
+            // The programData should already be in the correct format:
+            // { "LED0": [...steps...], "LED1": [...steps...], ... }
+            // Convert the programData object to a JSON string
+            // The 'null, 2' arguments pretty-print the JSON with an indent of 2 spaces
+            const jsonString = JSON.stringify(programData, null, 2);
 
-                // Create a Blob with the JSON string
-                const blob = new Blob([jsonString], { type: 'application/json' });
+            // Create a Blob with the JSON string
+            const blob = new Blob([jsonString], { type: 'application/json' });
 
-                // Create a temporary anchor element (<a>) to trigger the download
-                const a = document.createElement('a');
-                a.href = URL.createObjectURL(blob); // Set the href to a URL representing the Blob
-                a.download = 'program.json';     // Set the desired filename for the download
+            // Create a temporary anchor element (<a>) to trigger the download
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob); // Set the href to a URL representing the Blob
+            a.download = 'program.json';     // Set the desired filename for the download
 
-                // Append the anchor to the body, click it, then remove it
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
+            // Append the anchor to the body, click it, then remove it
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
 
-                // Revoke the object URL to free up resources
-                URL.revokeObjectURL(a.href);
+            // Revoke the object URL to free up resources
+            URL.revokeObjectURL(a.href);
 
-                console.log("program.json exported.");
-                alert("program.json has been prepared for download!");
-            });
-        }
+            console.log("program.json exported.");
+            alert("program.json has been prepared for download!");
+        });
+    }
 
     console.log('Export button initialized!')
 
-const loadProgramButton = document.getElementById('load-program-button');
+    const loadProgramButton = document.getElementById('load-program-button');
     const fileInput = document.getElementById('file-input');
 
     if (loadProgramButton && fileInput) {
@@ -664,7 +674,7 @@ const loadProgramButton = document.getElementById('load-program-button');
                                     isValidStructure = false;
                                 }
                             });
-                            if(!isValidStructure) break;
+                            if (!isValidStructure) break;
                         }
 
                         if (!isValidStructure) {
@@ -710,12 +720,12 @@ const loadProgramButton = document.getElementById('load-program-button');
             alert("Please select at least 2 LEDs (source + targets)");
             return;
         }
-        
+
         // Get the last selected LED as source (using Array.from gives insertion order)
         const selectedArray = Array.from(selectedLedIndices);
         const sourceLedIndex = selectedArray[selectedArray.length - 1];
         const sourceProgram = programData[`LED${sourceLedIndex}`];
-        
+
         if (!sourceProgram || sourceProgram.length === 0) {
             alert("Source LED has no program to copy");
             return;

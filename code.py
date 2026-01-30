@@ -11,7 +11,7 @@ import adafruit_tlc5947
 # Constants
 # -----------------------
 NUM_CHANNELS = 24  # Number of TLC5947 channels (24 LEDs)
-TICK_MS = 10000  # 50 ms update period. The whole plate takes 42 ms to update, so the tick needs to be larger than 42 ms. 50 ms is the minimum time that will keep accuracy in the programs. Longer ticks can be used for "stable programs" where there is no need for fast transitions.
+TICK_MS = 50  # Default update period. This value is overridden dynamically based on the program.json content: 50ms for animations (RAMP/SINE), or optimized for static steps (min 50ms).
 SLEEP = 0.001 # time sleep in seconds to avoid CPU overload.
 
 # -----------------------
@@ -121,11 +121,49 @@ except OSError:
 led_programs = [LEDProgram(program_data.get(f"LED{i}", []), i) for i in range(NUM_CHANNELS)]
 
 # -----------------------
+# Dynamic Tick Calculation
+# -----------------------
+# Determine the optimal TICK_MS.
+# If any LED has RAMP or SINE, we need high resolution (50ms).
+# If all are ON/OFF, we can use the smallest duration as the tick (min 50ms).
+min_duration = float("inf")
+has_movement = False
+
+for i in range(NUM_CHANNELS):
+    steps = program_data.get(f"LED{i}", [])
+    for step in steps:
+        dur = step.get("duration_ms", 0)
+        s_type = step.get("type", "OFF")
+        
+        if dur > 0:
+            min_duration = min(min_duration, dur)
+        
+        if s_type in ["RAMP", "SINE"]:
+            has_movement = True
+
+# Decide TICK_MS
+if has_movement:
+    TICK_MS = 50
+    print("Dynamic TICK: Found RAMP/SINE. Setting TICK_MS = 50")
+elif min_duration != float("inf"):
+    TICK_MS = max(50, int(min_duration))
+    print(f"Dynamic TICK: Static program. Setting TICK_MS = {TICK_MS}")
+else:
+    TICK_MS = 50 # Default safe fallback
+    print("Dynamic TICK: Defaulting to 50")
+
+# Global Experiment Duration (in minutes, 0 or None means infinite)
+total_duration_minutes = program_data.get("total_duration_minutes", 0)
+print(f"Global experiment duration: {total_duration_minutes} minutes")
+
+# -----------------------
 # Main Control Loop
 # -----------------------
 print("Starting LED control loop...")
 
 last_time = time.monotonic() * 1000
+experiment_start_time = time.monotonic()
+experiment_finished = False
 
 while True:
     now = time.monotonic() * 1000
@@ -136,7 +174,18 @@ while True:
         
         # Update each LED program and set intensity
         for i in range(NUM_CHANNELS):
-            uw_intensity = led_programs[i].update(TICK_MS)  # µW/cm²
+            # Check global timeout
+            if not experiment_finished and total_duration_minutes > 0:
+                total_elapsed_sec = time.monotonic() - experiment_start_time
+                if total_elapsed_sec >= (total_duration_minutes * 60):
+                    print("Global experiment time reached. Turning off all LEDs.")
+                    experiment_finished = True
+            
+            if experiment_finished:
+                 uw_intensity = 0
+            else:
+                 uw_intensity = led_programs[i].update(TICK_MS)  # µW/cm²
+            
             led[i] = uw_cm2_to_pwm(uw_intensity, i)  # Set PWM directly (12-bit)
 
     # Small sleep to avoid high CPU usage
