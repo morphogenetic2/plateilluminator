@@ -480,49 +480,147 @@ document.addEventListener('DOMContentLoaded', () => {
 
         steps.forEach((step, originalIndex) => {
             const stepBlock = document.createElement('div');
-            stepBlock.className = 'timeline-step-block draggable-step'; // For styling and SortableJS
-            stepBlock.dataset.stepOriginalIndex = originalIndex; // Store original index before any sorts
+            stepBlock.className = 'timeline-step-block draggable-step';
+            stepBlock.dataset.stepOriginalIndex = originalIndex;
 
-            stepBlock.style.minHeight = '80px';
+            // Fixed dimensions
+            const BLOCK_HEIGHT = 80;
+            let blockWidth;
+            if (step.duration_ms <= 2000) {
+                blockWidth = BLOCK_SIZE_SMALL_PX;
+            } else if (step.duration_ms <= 5000) {
+                blockWidth = BLOCK_SIZE_MEDIUM_PX;
+            } else {
+                blockWidth = BLOCK_SIZE_LARGE_PX;
+            }
+
+            // Container styling with EXPLICIT dimensions
+            stepBlock.style.width = blockWidth + 'px';
+            stepBlock.style.height = BLOCK_HEIGHT + 'px';
             stepBlock.style.border = '1px solid #ccc';
             stepBlock.style.marginRight = '5px';
-            stepBlock.style.padding = '5px';
-            stepBlock.style.fontSize = '0.8em';
-            stepBlock.style.overflow = 'hidden'; // Or 'auto' if content might exceed
             stepBlock.style.position = 'relative';
+            stepBlock.style.backgroundColor = '#fafafa';
+            stepBlock.style.boxSizing = 'border-box';
 
-            // Assign categorized width
-            if (step.duration_ms <= 2000) {
-                stepBlock.style.width = `${BLOCK_SIZE_SMALL_PX}px`;
-            } else if (step.duration_ms <= 5000) {
-                stepBlock.style.width = `${BLOCK_SIZE_MEDIUM_PX}px`;
-            } else {
-                stepBlock.style.width = `${BLOCK_SIZE_LARGE_PX}px`;
+            // Create SVG with explicit pixel dimensions
+            const SVG_NS = "http://www.w3.org/2000/svg";
+            const svg = document.createElementNS(SVG_NS, "svg");
+            svg.setAttribute("width", blockWidth);
+            svg.setAttribute("height", BLOCK_HEIGHT);
+            svg.setAttribute("viewBox", "0 0 " + blockWidth + " " + BLOCK_HEIGHT);
+            svg.style.display = 'block';
+            svg.style.position = 'absolute';
+            svg.style.top = '0';
+            svg.style.left = '0';
+
+            // Y mapping: intensity 0 = bottom (y=75), intensity 1400 = top (y=5)
+            const MAX_INT = 1400;
+            const Y_TOP = 5;
+            const Y_BOTTOM = 75;
+            const mapY = (intensity) => Y_BOTTOM - ((intensity / MAX_INT) * (Y_BOTTOM - Y_TOP));
+
+            let desc = step.type;
+
+            if (step.type === 'ON') {
+                const y = mapY(step.int || 0);
+
+                // Filled area below the line
+                const rect = document.createElementNS(SVG_NS, "rect");
+                rect.setAttribute("x", 0);
+                rect.setAttribute("y", y);
+                rect.setAttribute("width", blockWidth);
+                rect.setAttribute("height", Y_BOTTOM - y);
+                rect.setAttribute("fill", "#ffdd57");
+                rect.setAttribute("opacity", "0.4");
+                svg.appendChild(rect);
+
+                // Intensity line
+                const line = document.createElementNS(SVG_NS, "line");
+                line.setAttribute("x1", 0);
+                line.setAttribute("y1", y);
+                line.setAttribute("x2", blockWidth);
+                line.setAttribute("y2", y);
+                line.setAttribute("stroke", "#ffdd57");
+                line.setAttribute("stroke-width", 3);
+                svg.appendChild(line);
+
+                desc = "ON: " + step.int;
+
+            } else if (step.type === 'OFF') {
+                const y = mapY(0);
+
+                const line = document.createElementNS(SVG_NS, "line");
+                line.setAttribute("x1", 0);
+                line.setAttribute("y1", y);
+                line.setAttribute("x2", blockWidth);
+                line.setAttribute("y2", y);
+                line.setAttribute("stroke", "#ff3860");
+                line.setAttribute("stroke-width", 3);
+                svg.appendChild(line);
+
+                desc = "OFF";
+
+            } else if (step.type === 'RAMP') {
+                const y1 = mapY(step.int0 || 0);
+                const y2 = mapY(step.int1 || 0);
+
+                const line = document.createElementNS(SVG_NS, "line");
+                line.setAttribute("x1", 0);
+                line.setAttribute("y1", y1);
+                line.setAttribute("x2", blockWidth);
+                line.setAttribute("y2", y2);
+                line.setAttribute("stroke", "#3273dc");
+                line.setAttribute("stroke-width", 3);
+                svg.appendChild(line);
+
+                desc = "RAMP: " + step.int0 + "→" + step.int1;
+
+            } else if (step.type === 'SINE') {
+                const mid = ((step.int0 || 0) + (step.int1 || 0)) / 2;
+                const amp = Math.abs((step.int1 || 0) - (step.int0 || 0)) / 2;
+                const freq = step.freq || 1;
+                const durSec = step.duration_ms / 1000;
+
+                let pathData = "";
+                for (let px = 0; px <= blockWidth; px += 2) {
+                    const t = (px / blockWidth) * durSec;
+                    const intensity = mid + amp * Math.sin(2 * Math.PI * freq * t);
+                    const y = mapY(intensity);
+                    if (px === 0) {
+                        pathData = "M " + px + " " + y;
+                    } else {
+                        pathData += " L " + px + " " + y;
+                    }
+                }
+
+                const path = document.createElementNS(SVG_NS, "path");
+                path.setAttribute("d", pathData);
+                path.setAttribute("fill", "none");
+                path.setAttribute("stroke", "#b86bff");
+                path.setAttribute("stroke-width", 2);
+                svg.appendChild(path);
+
+                desc = "SINE: " + step.int0 + "~" + step.int1;
             }
 
-            let stepContent = `<strong>${step.type.toUpperCase()}</strong><br>`;
-            switch (step.type) {
-                case 'ON':
-                    stepBlock.style.backgroundColor = 'lightgreen';
-                    stepContent += `Int: ${step.int}<br>Dur: ${step.duration_ms}ms`;
-                    break;
-                case 'OFF':
-                    stepBlock.style.backgroundColor = 'lightcoral';
-                    stepContent += `Dur: ${step.duration_ms}ms`;
-                    break;
-                case 'RAMP':
-                    stepBlock.style.backgroundColor = 'lightskyblue';
-                    stepContent += `${step.int0}➔${step.int1}<br>Dur: ${step.duration_ms}ms`;
-                    break;
-                case 'SINE':
-                    stepBlock.style.backgroundColor = 'lightgoldenrodyellow';
-                    stepContent += `${step.int0}~${step.int1}<br>F:${step.freq}Hz<br>Dur:${step.duration_ms}ms`;
-                    break;
-                default:
-                    stepBlock.style.backgroundColor = 'lightgrey';
-                    stepContent += `Dur: ${step.duration_ms}ms`; // Fallback content
-            }
-            stepBlock.innerHTML = stepContent;
+            stepBlock.appendChild(svg);
+
+            // Text overlay at bottom
+            const label = document.createElement('div');
+            label.style.position = 'absolute';
+            label.style.bottom = '2px';
+            label.style.left = '4px';
+            label.style.fontSize = '10px';
+            label.style.color = '#333';
+            label.style.pointerEvents = 'none';
+            label.style.whiteSpace = 'nowrap';
+            label.textContent = desc + " (" + step.duration_ms + "ms)";
+            stepBlock.appendChild(label);
+
+            // Tooltip
+            stepBlock.title = desc + "\nDuration: " + step.duration_ms + "ms";
+
             timelineWrapper.appendChild(stepBlock);
         });
 
