@@ -124,10 +124,11 @@ led_programs = [LEDProgram(program_data.get(f"LED{i}", []), i) for i in range(NU
 # Dynamic Tick Calculation
 # -----------------------
 # Determine the optimal TICK_MS.
-# If any LED has RAMP or SINE, we need high resolution (50ms).
-# If all are ON/OFF, we can use the smallest duration as the tick (min 50ms).
+# If any LED has RAMP or SINE, we calculate based on active animation LEDs.
+# If all are ON/OFF, we can use the smallest duration as the tick.
+# -----------------------
 min_duration = float("inf")
-has_movement = False
+animation_led_indices = set()  # Track LEDs with SINE/RAMP steps
 
 for i in range(NUM_CHANNELS):
     steps = program_data.get(f"LED{i}", [])
@@ -139,17 +140,24 @@ for i in range(NUM_CHANNELS):
             min_duration = min(min_duration, dur)
         
         if s_type in ["RAMP", "SINE"]:
-            has_movement = True
+            animation_led_indices.add(i)
 
 # Decide TICK_MS
-if has_movement:
-    TICK_MS = 50
-    print("Dynamic TICK: Found RAMP/SINE. Setting TICK_MS = 50")
+animation_led_count = len(animation_led_indices)
+
+if animation_led_count > 0:
+    # Calculate TICK based on number of animation LEDs
+    # ~1.75ms per LED for SPI update, minimum 5ms floor
+    import math
+    calculated_tick = math.ceil(1.75 * animation_led_count)
+    TICK_MS = max(5, calculated_tick)
+    print(f"Dynamic TICK: Found {animation_led_count} LEDs with RAMP/SINE. Setting TICK_MS = {TICK_MS}")
 elif min_duration != float("inf"):
+    # Static program: use step duration as tick (min 50ms for stability)
     TICK_MS = max(50, int(min_duration))
     print(f"Dynamic TICK: Static program. Setting TICK_MS = {TICK_MS}")
 else:
-    TICK_MS = 50 # Default safe fallback
+    TICK_MS = 50  # Default safe fallback
     print("Dynamic TICK: Defaulting to 50")
 
 # Global Experiment Duration (in minutes, 0 or None means infinite)
