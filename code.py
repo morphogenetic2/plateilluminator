@@ -192,9 +192,12 @@ while True:
             if experiment_finished:
                  uw_intensity = 0
             else:
-                 uw_intensity = led_programs[i].update(TICK_MS)  # µW/cm²
+                 # BUGFIX: Pass actual elapsed time, not target TICK_MS
+                 # This ensures SINE/RAMP calculations use real-world timing
+                 uw_intensity = led_programs[i].update(elapsed)  # µW/cm²
             
             led[i] = uw_cm2_to_pwm(uw_intensity, i)  # Set PWM directly (12-bit)
 
     # Small sleep to avoid high CPU usage
     time.sleep(SLEEP)
+

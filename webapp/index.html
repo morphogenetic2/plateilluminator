@@ -19,7 +19,6 @@
             outline-offset: 2px;
         }
     </style>
-    <script src="script.js"></script>
 </head>
 
 <body>
@@ -206,14 +205,60 @@
 
             <!-- Global Settings Row -->
             <div class="columns is-centered mt-4">
-                <div class="column is-one-third">
-                    <div class="field">
-                        <label class="label has-text-centered">Total Run Time (minutes)</label>
-                        <div class="control">
-                            <input id="total-duration" class="input has-text-centered" type="number"
-                                placeholder="e.g. 300 (0 for infinite)" min="0">
+                <div class="column is-narrow has-text-centered">
+                    <label class="label">Total Run Time</label>
+                    <!-- Clickable Display Button -->
+                    <button class="time-picker-display" id="time-picker-display">
+                        <span class="icon"><i class="fas fa-clock"></i></span>
+                        <span id="time-display-text">00:00:00</span>
+                    </button>
+                    <p class="help mt-2">Click to set. 00:00:00 = no limit.</p>
+
+                    <!-- Hidden inputs for export compatibility -->
+                    <input type="hidden" id="run-time-hours" value="0">
+                    <input type="hidden" id="run-time-minutes" value="0">
+                    <input type="hidden" id="run-time-seconds" value="0">
+                </div>
+            </div>
+
+            <!-- Time Picker Modal -->
+            <div class="time-picker-modal-overlay" id="time-picker-modal">
+                <div class="time-picker-modal">
+                    <h3>Set Run Time</h3>
+                    <div class="time-spinners">
+                        <!-- Hours -->
+                        <div class="time-spinner">
+                            <button class="time-spinner-btn up" data-unit="hours">▲</button>
+                            <input type="number" class="time-spinner-value" id="spinner-hours" value="00" min="0"
+                                max="99">
+                            <button class="time-spinner-btn down" data-unit="hours">▼</button>
+                            <div class="time-spinner-label">Hours</div>
                         </div>
-                        <p class="help has-text-centered">Set to 0 or leave empty for no time limit.</p>
+                        <div class="time-separator">:</div>
+                        <!-- Minutes -->
+                        <div class="time-spinner">
+                            <button class="time-spinner-btn up" data-unit="minutes">▲</button>
+                            <input type="number" class="time-spinner-value" id="spinner-minutes" value="00" min="0"
+                                max="59">
+                            <button class="time-spinner-btn down" data-unit="minutes">▼</button>
+                            <div class="time-spinner-label">Minutes</div>
+                        </div>
+                        <div class="time-separator">:</div>
+                        <!-- Seconds -->
+                        <div class="time-spinner">
+                            <button class="time-spinner-btn up" data-unit="seconds">▲</button>
+                            <input type="number" class="time-spinner-value" id="spinner-seconds" value="00" min="0"
+                                max="59">
+                            <button class="time-spinner-btn down" data-unit="seconds">▼</button>
+                            <div class="time-spinner-label">Seconds</div>
+                        </div>
+                    </div>
+                    <div class="time-picker-buttons">
+                        <button class="button is-success" id="time-picker-confirm">
+                            <span class="icon"><i class="fas fa-check"></i></span>
+                            <span>Confirm</span>
+                        </button>
+                        <button class="button" id="time-picker-cancel">Cancel</button>
                     </div>
                 </div>
             </div>
@@ -222,6 +267,7 @@
     </section>
 
 
+    <script src="script.js"></script>
 </body>
 
 </html>

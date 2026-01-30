@@ -1,520 +1,114 @@
 document.addEventListener('DOMContentLoaded', () => {
-    const ledGridPane = document.getElementById('led-grid-pane');
-    const ledSelectionBoxContent = ledGridPane.querySelector('.box');
+    // ==========================================
+    // MODULE: STATE
+    // ==========================================
+    const NUM_LEDS = 24;
+    const State = {
+        programData: {},            // { "LED0": [...], ... }
+        selectedLedIndices: new Set(),
+        currentlyViewedLedIndex: null,
+        currentStepType: 'ON',
+    };
 
-    const placeholderText = ledSelectionBoxContent.querySelector('p');
-    if (placeholderText && placeholderText.textContent.includes('Loading grid...')) {
-        placeholderText.remove();
-    }
-
-    const numRows = 4;
-    const numCols = 6;
-    const totalLeds = numRows * numCols;
-
-    // --- State for selected LEDs ---
-    let selectedLedIndices = new Set(); // Use a Set to store 0-based indices of selected LEDs
-
-    // --- Helper function to update button appearance ---
-    function updateAllLedButtonAppearances() {
-        allLedButtons.forEach(btn => {
-            const ledId = parseInt(btn.dataset.ledId);
-            const isSelected = selectedLedIndices.has(ledId);
-            const isCurrentlyViewed = (ledId === currentlyViewedLedIndex);
-
-            // Reset classes first
-            btn.classList.remove('is-info', 'is-success', 'is-outlined');
-
-            if (isCurrentlyViewed) {
-                btn.classList.add('is-success'); // Green for the timeline-active LED
-            } else if (isSelected) {
-                btn.classList.add('is-info'); // Blue for other selected LEDs
-            } else {
-                btn.classList.add('is-outlined'); // Default outlined for non-selected
-            }
-        });
-    }
-
-    // --- Create the LED Grid ---
-    const gridContainer = document.createElement('div');
-    gridContainer.className = 'led-grid-actual mb-4';
-    gridContainer.style.display = 'grid';
-    gridContainer.style.gridTemplateColumns = `repeat(${numCols}, 1fr)`;
-    gridContainer.style.gap = '0.5rem';
-
-
-
-    // Store all LED button elements for easy access later
-    const allLedButtons = [];
-
-    for (let i = 0; i < totalLeds; i++) {
-        const ledButton = document.createElement('button');
-        const ledDisplayNumber = i + 1;
-
-        ledButton.className = 'button is-rounded is-outlined led-button';
-        ledButton.textContent = ledDisplayNumber;
-        ledButton.dataset.ledId = i; // 0-based index
-
-        // Event Listener for individual LED button clicks
-        ledButton.addEventListener('click', (event) => {
-            const ledId = parseInt(ledButton.dataset.ledId);
-            const isCtrlClick = event.ctrlKey || event.metaKey; // metaKey for macOS Command
-
-            if (isCtrlClick) {
-                // --- Multi-selection logic ---
-                if (selectedLedIndices.has(ledId)) {
-                    selectedLedIndices.delete(ledId);
-                } else {
-                    selectedLedIndices.add(ledId);
-                }
-            } else {
-                // --- Single-selection logic ---
-                // If the clicked LED is the only one selected, deselect it.
-                // Otherwise, clear the selection and select only the clicked LED.
-                if (selectedLedIndices.has(ledId) && selectedLedIndices.size === 1) {
-                    selectedLedIndices.clear();
-                } else {
-                    selectedLedIndices.clear();
-                    selectedLedIndices.add(ledId);
-                }
-            }
-
-            // Set the timeline to the most recently clicked LED
-            currentlyViewedLedIndex = ledId;
-
-            console.log("Selected LEDs:", Array.from(selectedLedIndices).sort((a, b) => a - b));
-            updateAllLedButtonAppearances();
-            renderTimeline();
-        });
-
-        gridContainer.appendChild(ledButton);
-        allLedButtons.push(ledButton); // Add to our array
-    }
-    ledSelectionBoxContent.appendChild(gridContainer);
-
-    // --- Helper function to update button appearance based on program existence ---
-    function updateLedProgramOutline(ledIndex) {
-        const ledButton = allLedButtons[ledIndex];
-        if (!ledButton) return;
-
-        const ledKey = `LED${ledIndex}`;
-        const hasProgram = programData[ledKey] && programData[ledKey].length > 0;
-
-        if (hasProgram) {
-            ledButton.classList.add('has-program');
-        } else {
-            ledButton.classList.remove('has-program');
+    function initState() {
+        for (let i = 0; i < NUM_LEDS; i++) {
+            State.programData[`LED${i}`] = [];
         }
+        console.log("State initialized.");
     }
 
-    function updateAllLedOutlines() {
-        allLedButtons.forEach((btn, index) => updateLedProgramOutline(index));
-    }
-
-    // --- Create Select All / Select None buttons ---
-    // ---- MODIFIED/NEW SECTION for action buttons in LED Selection ----
-    const ledActionsContainer = document.createElement('div');
-    ledActionsContainer.className = 'field is-grouped is-grouped-multiline mt-4'; // For better wrapping if needed
-
-    // Select All Button (ensure it's created and added here)
-    const selectAllButton = document.createElement('button');
-    selectAllButton.className = 'button control'; // Added 'control' for grouping
-    selectAllButton.id = 'select-all-leds';
-    selectAllButton.textContent = 'Select All';
-    selectAllButton.addEventListener('click', () => {
-        allLedButtons.forEach(btn => {
-            const ledId = parseInt(btn.dataset.ledId);
-            selectedLedIndices.add(ledId);
-        });
-        updateAllLedButtonAppearances();
-        console.log("Selected LEDs:", Array.from(selectedLedIndices).sort((a, b) => a - b));
-        // No timeline update needed here unless your logic changes
-    });
-    ledActionsContainer.appendChild(selectAllButton);
-
-
-    // Select None Button (ensure it's created and added here)
-    const selectNoneButton = document.createElement('button');
-    selectNoneButton.className = 'button control'; // Added 'control'
-    selectNoneButton.id = 'select-none-leds';
-    selectNoneButton.textContent = 'Select None';
-    selectNoneButton.addEventListener('click', () => {
-        selectedLedIndices.clear();
-        updateAllLedButtonAppearances();
-        console.log("Selected LEDs:", Array.from(selectedLedIndices).sort((a, b) => a - b));
-        if (currentlyViewedLedIndex !== null && !selectedLedIndices.has(currentlyViewedLedIndex)) {
-            // If the timeline LED is no longer selected, perhaps clear timeline or show "no selection"
-            // For now, timeline stays on the last explicitly clicked LED.
-        }
-        // renderTimeline(); // Only if deselection should immediately clear timeline for a deselected viewed LED
-    });
-    ledActionsContainer.appendChild(selectNoneButton);
-
-
-    // **NEW** Clear Program for Selected LEDs Button
-    const clearSelectedProgramButton = document.createElement('button');
-    clearSelectedProgramButton.className = 'button is-warning control'; // 'is-warning' for a bit of caution
-    clearSelectedProgramButton.id = 'clear-selected-program';
-    clearSelectedProgramButton.innerHTML = '<span class="icon is-small"><i class="fas fa-eraser"></i></span><span>Clear Selected</span>'; // Icon + Text
-
-    clearSelectedProgramButton.addEventListener('click', () => {
-        if (selectedLedIndices.size === 0) {
-            alert("Please select one or more LEDs to clear their program.");
-            return;
-        }
-
-        // Confirmation dialog
-        if (!confirm(`Are you sure you want to clear the program for ${selectedLedIndices.size} selected LED(s)? This cannot be undone.`)) {
-            return;
-        }
-
-        let clearedAtLeastOne = false;
-        selectedLedIndices.forEach(ledIndex => {
-            const ledKey = `LED${ledIndex}`;
-            if (programData[ledKey] && programData[ledKey].length > 0) {
-                programData[ledKey] = []; // Reset the array of steps to empty
-                clearedAtLeastOne = true;
-                updateLedProgramOutline(ledIndex); // Update outline
-            }
-        });
-
-        if (clearedAtLeastOne) {
-            console.log("Program cleared for selected LEDs. programData:", JSON.parse(JSON.stringify(programData)));
-            alert("Program for selected LED(s) has been cleared.");
-            // If the currently viewed timeline LED was among those cleared, its timeline needs to update
-            if (currentlyViewedLedIndex !== null && selectedLedIndices.has(currentlyViewedLedIndex)) {
-                renderTimeline();
-            }
-        } else {
-            alert("Selected LED(s) already have an empty program.");
-        }
-    });
-    ledActionsContainer.appendChild(clearSelectedProgramButton); // Add the new button
-
-    // Append the container with all three buttons
-    ledSelectionBoxContent.appendChild(ledActionsContainer);
-
-    console.log('LED Grid interaction enabled!');
-
-    // --- Step Editor Logic (Icon Buttons) ---
-    let currentStepType = 'ON'; // Default selected type
-    const stepTypeButtons = document.querySelectorAll('.step-type-btn');
-    const paramsOnDiv = document.getElementById('params-on');
-    const paramsRampDiv = document.getElementById('params-ramp');
-    const paramsSineDiv = document.getElementById('params-sine');
-    const paramsDurationDiv = document.getElementById('params-duration');
-
-    // Store all parameter divs in an array for easy iteration
-    const allParamDivs = [paramsOnDiv, paramsRampDiv, paramsSineDiv];
-
-    function updateStepEditorForm() {
-        const selectedType = currentStepType;
-
-        // Hide all specific parameter divs first
-        allParamDivs.forEach(div => {
-            if (div) div.style.display = 'none';
-        });
-        // Always show duration
-        if (paramsDurationDiv) paramsDurationDiv.style.display = 'block';
-
-        // Show the relevant div based on selected type
-        if (selectedType === 'ON') {
-            if (paramsOnDiv) paramsOnDiv.style.display = 'block';
-        } else if (selectedType === 'RAMP') {
-            if (paramsRampDiv) paramsRampDiv.style.display = 'block';
-        } else if (selectedType === 'SINE') {
-            if (paramsSineDiv) paramsSineDiv.style.display = 'block';
-        } else if (selectedType === 'OFF') {
-            if (paramsDurationDiv) paramsDurationDiv.style.display = 'block';
-        }
-    }
-
-    // Add event listeners to the step type buttons
-    stepTypeButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            // Update state
-            currentStepType = btn.dataset.value;
-
-            // Update Visuals
-            stepTypeButtons.forEach(b => {
-                b.classList.remove('is-selected', 'is-info');
-            });
-            btn.classList.add('is-selected', 'is-info');
-
-            // Update Form Visibility
-            updateStepEditorForm();
-        });
-    });
-
-    // Call it once on page load
-    updateStepEditorForm();
-
-    console.log('Step Editor form initialized (Icon Buttons)!');
-
-    // --- Program Data Structure ---
-    let programData = {}; // Stores the program for all LEDs
-    const NUM_LEDS = 24; // From your Python script
-
-    // Initialize programData with empty arrays for each LED
-    for (let i = 0; i < NUM_LEDS; i++) {
-        programData[`LED${i}`] = [];
-    }
-    console.log("Initial programData:", JSON.parse(JSON.stringify(programData))); // Deep copy for clean log
-
-    // --- "Add Step" Button Logic ---
-    const addStepButton = document.getElementById('add-step-button');
-
-    // Get references to all input fields (do this once)
-    const onIntInput = document.getElementById('on-int');
-    const rampInt0Input = document.getElementById('ramp-int0');
-    const rampInt1Input = document.getElementById('ramp-int1');
-    const sineInt0Input = document.getElementById('sine-int0');
-    const sineInt1Input = document.getElementById('sine-int1');
-    const sineFreqInput = document.getElementById('sine-freq');
-    const stepDurationInput = document.getElementById('step-duration');
-
-
-    if (addStepButton) {
-        addStepButton.addEventListener('click', () => {
-            const type = currentStepType;
-            let durationMs = parseInt(stepDurationInput.value);
-
-            // --- Get references to input fields (already defined outside this listener) ---
-            // const onIntInput = document.getElementById('on-int');
-            // const rampInt0Input = document.getElementById('ramp-int0');
-            // ... etc.
-
-            const MAX_INTENSITY = 1400;
-            const MIN_DURATION = 50; // Minimum allowed duration in ms
-
-            if (selectedLedIndices.size === 0) {
-                alert("Please select at least one LED before adding a step.");
-                return;
-            }
-
-            // --- Validate and Clamp Duration ---
-            if (isNaN(durationMs) || durationMs < MIN_DURATION) {
-                alert(`Duration must be a number and at least ${MIN_DURATION} ms.`);
-                stepDurationInput.value = MIN_DURATION; // Correct the input field
-                // Optionally focus the field: stepDurationInput.focus();
-                return;
-            }
-
-            let step = {
-                type: type,
-                duration_ms: durationMs
-            };
-
-            // --- Helper function for clamping intensity ---
-            function clampIntensity(value) {
-                let numValue = parseInt(value);
-                if (isNaN(numValue)) numValue = 0; // Default to 0 if not a number
-                if (numValue < 0) return 0;
-                if (numValue > MAX_INTENSITY) return MAX_INTENSITY;
-                return numValue;
-            }
-
-            // --- Helper function for clamping frequency ---
-            function clampFrequency(value) {
-                let numValue = parseFloat(value);
-                if (isNaN(numValue)) numValue = 0;
-                if (numValue < 0) return 0;
-                if (numValue > 20) return 20; // Max 20 Hz (1000ms / 50ms TICK)
-                return numValue;
-            }
-
-
-            // Add type-specific parameters with validation and clamping
-            switch (type) {
-                case 'ON':
-                    const onIntValue = clampIntensity(onIntInput.value);
-                    step.int = onIntValue;
-                    onIntInput.value = onIntValue; // Update input field if clamped
-                    break;
-                case 'RAMP':
-                    const rampInt0Value = clampIntensity(rampInt0Input.value);
-                    const rampInt1Value = clampIntensity(rampInt1Input.value);
-                    step.int0 = rampInt0Value;
-                    step.int1 = rampInt1Value;
-                    rampInt0Input.value = rampInt0Value; // Update input fields
-                    rampInt1Input.value = rampInt1Value;
-                    break;
-                case 'SINE':
-                    const sineInt0Value = clampIntensity(sineInt0Input.value);
-                    const sineInt1Value = clampIntensity(sineInt1Input.value);
-                    const sineFreqValue = clampFrequency(sineFreqInput.value);
-                    step.int0 = sineInt0Value;
-                    step.int1 = sineInt1Value;
-                    step.freq = sineFreqValue;
-                    sineInt0Input.value = sineInt0Value; // Update input fields
-                    sineInt1Input.value = sineInt1Value;
-                    sineFreqInput.value = sineFreqValue;
-
-                    // Optional: Ensure int0 <= int1 for SINE/RAMP if that's a logical requirement
-                    if (step.int0 > step.int1 && (type === 'SINE' || type === 'RAMP')) {
-                        // Swap them or alert, for now, let's just note it.
-                        // console.warn(`${type}: int0 (${step.int0}) is greater than int1 (${step.int1}). Consider handling this.`);
-                        // For simplicity, we'll allow it, Python script might handle it or user needs to be aware
-                    }
-                    break;
-                case 'OFF':
-                    // No intensity/frequency params for OFF
-                    break;
-            }
-
-            // Add the created step to all currently selected LEDs
-            selectedLedIndices.forEach(ledIndex => {
-                if (!programData[`LED${ledIndex}`]) {
-                    programData[`LED${ledIndex}`] = [];
-                }
-                programData[`LED${ledIndex}`].push(step);
-                updateLedProgramOutline(ledIndex); // Update outline
-            });
-
-            console.log("Updated programData (with validation):", JSON.parse(JSON.stringify(programData)));
-            // No need for an alert here if the timeline updates, or make it a less intrusive notification
-            // alert(`Step added to ${selectedLedIndices.size} LED(s)!`);
-
-            renderTimeline(); // Update the visual timeline
-        });
-    }
-
-
-    const removeStepButton = document.getElementById('remove-step-button');
-
-    if (removeStepButton) {
-        removeStepButton.addEventListener('click', () => {
-            if (selectedLedIndices.size === 0) {
-                alert("Please select at least one LED from which to remove a step.");
-                return;
-            }
-
-            let
-                removedStepFromAtLeastOne = false;
-            selectedLedIndices.forEach(ledIndex => {
-                const ledKey = `LED${ledIndex}`;
-                if (programData[ledKey] && programData[ledKey].length > 0) {
-                    programData[ledKey].pop(); // .pop() removes the last element from an array
-                    removedStepFromAtLeastOne = true;
-                    updateLedProgramOutline(ledIndex); // Update outline
-                }
-            });
-
-            if (removedStepFromAtLeastOne) {
-                console.log("After removing step - programData:", JSON.parse(JSON.stringify(programData)));
-                alert(`Last step removed from selected LED(s) where applicable. Check the console.`);
-            } else {
-                alert("No steps to remove from the selected LED(s).");
-            }
-
-            renderTimeline();
-        });
-    }
-
-    console.log('Remove Step button initialized!'); // Add this new log
-
-
-    const timelineDisplayDiv = document.getElementById('timeline-display');
-    const timelineLedLabel = document.getElementById('timeline-led-label'); // Get the span for the label
-
-    // --- State for currently viewed timeline ---
-    let currentlyViewedLedIndex = null; // 0-based index
-
-    // --- Function to update the timeline display ---
-    // --- Function to update the timeline display ---
-    // Ensure 'timelineSortableInstance' is declared outside this function, e.g., let timelineSortableInstance = null;
-    // Ensure 'programData', 'currentlyViewedLedIndex', 'timelineDisplayDiv', 'timelineLedLabel' are accessible in this scope.
-
-    timelineSortableInstance = null;
+    // ==========================================
+    // MODULE: TIMELINE
+    // ==========================================
+    const BLOCK_SIZE_SMALL_PX = 160;
+    const BLOCK_SIZE_MEDIUM_PX = 240;
+    const BLOCK_SIZE_LARGE_PX = 320;
+    let timelineSortableInstance = null;
 
     function renderTimeline() {
+        const timelineDisplayDiv = document.getElementById('timeline-display');
+        const timelineLedLabel = document.getElementById('timeline-led-label');
+
         if (!timelineDisplayDiv) {
             console.error("Timeline display div not found!");
             return;
         }
-        timelineDisplayDiv.innerHTML = ''; // Clear previous timeline content
+        timelineDisplayDiv.innerHTML = '';
 
+        // Update Label
         if (timelineLedLabel) {
-            if (currentlyViewedLedIndex !== null) {
-                timelineLedLabel.textContent = `LED ${currentlyViewedLedIndex + 1}`;
+            if (State.currentlyViewedLedIndex !== null) {
+                timelineLedLabel.textContent = `LED ${State.currentlyViewedLedIndex + 1}`;
             } else {
                 timelineLedLabel.textContent = 'No LED Selected for Timeline';
             }
         }
 
-        // Destroy previous Sortable instance if it exists
+        // Destroy previous Sortable instance
         if (timelineSortableInstance) {
             timelineSortableInstance.destroy();
             timelineSortableInstance = null;
         }
 
-        if (currentlyViewedLedIndex === null || !programData[`LED${currentlyViewedLedIndex}`]) {
+        // Check if valid LED selected
+        if (State.currentlyViewedLedIndex === null || !State.programData[`LED${State.currentlyViewedLedIndex}`]) {
             const noStepsMsg = document.createElement('p');
             noStepsMsg.className = 'has-text-centered has-text-grey p-4';
-            noStepsMsg.textContent = (currentlyViewedLedIndex !== null) ? `LED ${currentlyViewedLedIndex + 1} has no steps yet.` : 'No LED selected to display timeline.';
+            noStepsMsg.textContent = (State.currentlyViewedLedIndex !== null)
+                ? `LED ${State.currentlyViewedLedIndex + 1} has no steps yet.`
+                : 'No LED selected to display timeline.';
             timelineDisplayDiv.appendChild(noStepsMsg);
             return;
         }
 
-        const steps = programData[`LED${currentlyViewedLedIndex}`];
+        const steps = State.programData[`LED${State.currentlyViewedLedIndex}`];
 
         if (steps.length === 0) {
             const noStepsMsg = document.createElement('p');
             noStepsMsg.className = 'has-text-centered has-text-grey p-4';
-            noStepsMsg.textContent = `LED ${currentlyViewedLedIndex + 1} has no steps.`;
+            noStepsMsg.textContent = `LED ${State.currentlyViewedLedIndex + 1} has no steps.`;
             timelineDisplayDiv.appendChild(noStepsMsg);
             return;
         }
 
-        // Define Block Sizes
-        const BLOCK_SIZE_SMALL_PX = 160; // Was 80
-        const BLOCK_SIZE_MEDIUM_PX = 240; // Was 120
-        const BLOCK_SIZE_LARGE_PX = 320; // Was 160
-
+        // Create Wrapper
         const timelineWrapper = document.createElement('div');
-        // Optional: Give it a unique ID if needed for complex scenarios, though destroying instance is primary
-        // timelineWrapper.id = `timeline-wrapper-led-${currentlyViewedLedIndex}`;
         timelineWrapper.style.display = 'flex';
         timelineWrapper.style.position = 'relative';
         timelineWrapper.style.minHeight = '100px';
-        timelineWrapper.style.paddingTop = '25px'; // Space for time markers above
+        timelineWrapper.style.paddingTop = '25px';
 
+        // Render Steps
         steps.forEach((step, originalIndex) => {
-            // Main Container (Draggable)
             const stepBlock = document.createElement('div');
             stepBlock.className = 'timeline-step-block draggable-step';
             stepBlock.dataset.stepOriginalIndex = originalIndex;
 
-            // Dimensions logic
+            // Dimensions
             const BLOCK_HEIGHT = 80;
             let blockWidth;
-            if (step.duration_ms <= 2000) {
-                blockWidth = BLOCK_SIZE_SMALL_PX; // 160
-            } else if (step.duration_ms <= 5000) {
-                blockWidth = BLOCK_SIZE_MEDIUM_PX; // 240
-            } else {
-                blockWidth = BLOCK_SIZE_LARGE_PX; // 320
-            }
+            if (step.duration_ms <= 2000) blockWidth = BLOCK_SIZE_SMALL_PX;
+            else if (step.duration_ms <= 5000) blockWidth = BLOCK_SIZE_MEDIUM_PX;
+            else blockWidth = BLOCK_SIZE_LARGE_PX;
 
-            // Container Styling: Column Layout
             stepBlock.style.width = blockWidth + 'px';
             stepBlock.style.display = 'flex';
-            stepBlock.style.flexDirection = 'column'; // Vertical stack
+            stepBlock.style.flexDirection = 'column';
             stepBlock.style.marginRight = '5px';
             stepBlock.style.position = 'relative';
             stepBlock.style.boxSizing = 'border-box';
-            // Note: Border/Background moved to visualBlock
 
-            // --- 1. Visual Block (Top) ---
+            // Visual Block
             const visualBlock = document.createElement('div');
             visualBlock.style.width = '100%';
             visualBlock.style.height = BLOCK_HEIGHT + 'px';
             visualBlock.style.border = '1px solid #ccc';
             visualBlock.style.backgroundColor = '#fafafa';
-            visualBlock.style.position = 'relative'; // For SVG absolute positioning
+            visualBlock.style.position = 'relative';
             visualBlock.style.boxSizing = 'border-box';
-            visualBlock.style.cursor = 'grab'; // Visual cue for dragging
+            visualBlock.style.cursor = 'grab';
 
-            // Create SVG with explicit pixel dimensions
+            // SVG
             const SVG_NS = "http://www.w3.org/2000/svg";
             const svg = document.createElementNS(SVG_NS, "svg");
             svg.setAttribute("width", blockWidth);
@@ -525,7 +119,6 @@ document.addEventListener('DOMContentLoaded', () => {
             svg.style.top = '0';
             svg.style.left = '0';
 
-            // Y mapping: intensity 0 = bottom (y=75), intensity 1400 = top (y=5)
             const MAX_INT = 1400;
             const Y_TOP = 5;
             const Y_BOTTOM = 75;
@@ -535,206 +128,133 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (step.type === 'ON') {
                 const y = mapY(step.int || 0);
-
-                // Filled area below the line
                 const rect = document.createElementNS(SVG_NS, "rect");
-                rect.setAttribute("x", 0);
-                rect.setAttribute("y", y);
-                rect.setAttribute("width", blockWidth);
-                rect.setAttribute("height", Y_BOTTOM - y);
-                rect.setAttribute("fill", "#ffdd57");
-                rect.setAttribute("opacity", "0.4");
+                rect.setAttribute("x", 0); rect.setAttribute("y", y);
+                rect.setAttribute("width", blockWidth); rect.setAttribute("height", Y_BOTTOM - y);
+                rect.setAttribute("fill", "#ffdd57"); rect.setAttribute("opacity", "0.4");
                 svg.appendChild(rect);
-
-                // Intensity line
                 const line = document.createElementNS(SVG_NS, "line");
-                line.setAttribute("x1", 0);
-                line.setAttribute("y1", y);
-                line.setAttribute("x2", blockWidth);
-                line.setAttribute("y2", y);
-                line.setAttribute("stroke", "#ffdd57");
-                line.setAttribute("stroke-width", 3);
+                line.setAttribute("x1", 0); line.setAttribute("y1", y);
+                line.setAttribute("x2", blockWidth); line.setAttribute("y2", y);
+                line.setAttribute("stroke", "#ffdd57"); line.setAttribute("stroke-width", 3);
                 svg.appendChild(line);
-
                 desc = "ON: " + step.int;
-
             } else if (step.type === 'OFF') {
                 const y = mapY(0);
-
                 const line = document.createElementNS(SVG_NS, "line");
-                line.setAttribute("x1", 0);
-                line.setAttribute("y1", y);
-                line.setAttribute("x2", blockWidth);
-                line.setAttribute("y2", y);
-                line.setAttribute("stroke", "#ff3860");
-                line.setAttribute("stroke-width", 3);
+                line.setAttribute("x1", 0); line.setAttribute("y1", y);
+                line.setAttribute("x2", blockWidth); line.setAttribute("y2", y);
+                line.setAttribute("stroke", "#ff3860"); line.setAttribute("stroke-width", 3);
                 svg.appendChild(line);
-
                 desc = "OFF";
-
             } else if (step.type === 'RAMP') {
                 const y1 = mapY(step.int0 || 0);
                 const y2 = mapY(step.int1 || 0);
-
                 const line = document.createElementNS(SVG_NS, "line");
-                line.setAttribute("x1", 0);
-                line.setAttribute("y1", y1);
-                line.setAttribute("x2", blockWidth);
-                line.setAttribute("y2", y2);
-                line.setAttribute("stroke", "#3273dc");
-                line.setAttribute("stroke-width", 3);
+                line.setAttribute("x1", 0); line.setAttribute("y1", y1);
+                line.setAttribute("x2", blockWidth); line.setAttribute("y2", y2);
+                line.setAttribute("stroke", "#3273dc"); line.setAttribute("stroke-width", 3);
                 svg.appendChild(line);
-
-                desc = "RAMP: " + step.int0 + "→" + step.int1;
-
+                desc = "RAMP: " + step.int0 + "->" + step.int1;
             } else if (step.type === 'SINE') {
                 const mid = ((step.int0 || 0) + (step.int1 || 0)) / 2;
                 const amp = Math.abs((step.int1 || 0) - (step.int0 || 0)) / 2;
                 const freq = step.freq || 1;
                 const durSec = step.duration_ms / 1000;
-
                 let pathData = "";
                 for (let px = 0; px <= blockWidth; px += 2) {
                     const t = (px / blockWidth) * durSec;
                     const intensity = mid + amp * Math.sin(2 * Math.PI * freq * t);
                     const y = mapY(intensity);
-                    if (px === 0) {
-                        pathData = "M " + px + " " + y;
-                    } else {
-                        pathData += " L " + px + " " + y;
-                    }
+                    if (px === 0) pathData = "M " + px + " " + y;
+                    else pathData += " L " + px + " " + y;
                 }
-
                 const path = document.createElementNS(SVG_NS, "path");
-                path.setAttribute("d", pathData);
-                path.setAttribute("fill", "none");
-                path.setAttribute("stroke", "#b86bff");
-                path.setAttribute("stroke-width", 2);
+                path.setAttribute("d", pathData); path.setAttribute("fill", "none");
+                path.setAttribute("stroke", "#b86bff"); path.setAttribute("stroke-width", 2);
                 svg.appendChild(path);
-
                 desc = "SINE: " + step.int0 + "~" + step.int1;
             }
 
             visualBlock.appendChild(svg);
 
-            // Text overlay at bottom of visual block
+            // Label
             const label = document.createElement('div');
-            label.style.position = 'absolute';
-            label.style.bottom = '2px';
-            label.style.left = '4px';
-            label.style.fontSize = '10px';
-            label.style.color = '#333';
-            label.style.pointerEvents = 'none';
-            label.style.whiteSpace = 'nowrap';
-            label.textContent = desc + " (" + step.duration_ms + "ms)";
+            label.style.position = 'absolute'; label.style.bottom = '2px'; label.style.left = '4px';
+            label.style.fontSize = '10px'; label.style.color = '#333'; label.style.pointerEvents = 'none';
+            label.style.whiteSpace = 'nowrap'; label.textContent = desc + " (" + step.duration_ms + "ms)";
             visualBlock.appendChild(label);
-
             stepBlock.appendChild(visualBlock);
 
-
-            // --- 2. Controls Block (Bottom) ---
+            // Controls Block
             const controlsBlock = document.createElement('div');
-            controlsBlock.style.width = '100%';
-            controlsBlock.style.height = '24px';
-            controlsBlock.style.display = 'flex';
-            controlsBlock.style.justifyContent = 'center'; // Center the button
-            controlsBlock.style.alignItems = 'center';
-            controlsBlock.style.backgroundColor = 'transparent'; // Clean look
+            controlsBlock.style.width = '100%'; controlsBlock.style.height = '24px';
+            controlsBlock.style.display = 'flex'; controlsBlock.style.justifyContent = 'center'; controlsBlock.style.alignItems = 'center';
 
-            // Tooltip for the whole step block
-            stepBlock.title = desc + "\nDuration: " + step.duration_ms + "ms";
-
-            // Delete Button
             const deleteBtn = document.createElement('div');
             deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
-            deleteBtn.style.cursor = 'pointer';
-            deleteBtn.style.color = '#999';
-            deleteBtn.style.fontSize = '12px';
+            deleteBtn.style.cursor = 'pointer'; deleteBtn.style.color = '#999'; deleteBtn.style.fontSize = '12px';
             deleteBtn.title = 'Delete this step';
-
-            // Hover effects
             deleteBtn.addEventListener('mouseenter', () => deleteBtn.style.color = '#ff3860');
             deleteBtn.addEventListener('mouseleave', () => deleteBtn.style.color = '#999');
-
-            // Click handler
             deleteBtn.addEventListener('click', (e) => {
-                e.stopPropagation(); // Prevent drag
-
-                // Remove step
-                const currentLedKey = `LED${currentlyViewedLedIndex}`;
-                if (programData[currentLedKey]) {
-                    programData[currentLedKey].splice(originalIndex, 1);
-                    console.log(`Deleted step at index ${originalIndex}`);
-
-                    // Update UI
+                e.stopPropagation();
+                const currentLedKey = `LED${State.currentlyViewedLedIndex}`;
+                if (State.programData[currentLedKey]) {
+                    State.programData[currentLedKey].splice(originalIndex, 1);
                     renderTimeline();
-                    updateLedProgramOutline(currentlyViewedLedIndex);
+                    document.dispatchEvent(new CustomEvent('programChanged', { detail: { ledIndex: State.currentlyViewedLedIndex } }));
                 }
             });
 
             controlsBlock.appendChild(deleteBtn);
             stepBlock.appendChild(controlsBlock);
-
-            // Append to main wrapper
+            stepBlock.title = desc + "\nDuration: " + step.duration_ms + "ms";
             timelineWrapper.appendChild(stepBlock);
         });
 
-        timelineDisplayDiv.appendChild(timelineWrapper); // Add wrapper to DOM before initializing Sortable
+        timelineDisplayDiv.appendChild(timelineWrapper);
 
-        // Initialize SortableJS on the timelineWrapper
+        // SortableJS
         if (steps.length > 0) {
             timelineSortableInstance = new Sortable(timelineWrapper, {
                 animation: 150,
                 ghostClass: 'sortable-ghost',
                 chosenClass: 'sortable-chosen',
                 dragClass: 'sortable-drag',
-                filter: '.timeline-time-marker', // Elements with this class will not be draggable
-                preventOnFilter: true,      // Clicks on filtered elements prevent dragging
-
+                filter: '.timeline-time-marker',
+                preventOnFilter: true,
                 onEnd: function (evt) {
-                    if (evt.oldIndex === evt.newIndex) {
-                        return; // Item dropped in the same place
-                    }
-
-                    console.log(`Step moved for LED${currentlyViewedLedIndex}: from index ${evt.oldIndex} to ${evt.newIndex}`);
-
-                    const programForCurrentLed = programData[`LED${currentlyViewedLedIndex}`];
+                    if (evt.oldIndex === evt.newIndex) return;
+                    const programForCurrentLed = State.programData[`LED${State.currentlyViewedLedIndex}`];
                     if (programForCurrentLed) {
                         const [movedItem] = programForCurrentLed.splice(evt.oldIndex, 1);
                         programForCurrentLed.splice(evt.newIndex, 0, movedItem);
-
-                        console.log("programData updated after drag:", JSON.parse(JSON.stringify(programData)));
-                        renderTimeline(); // Re-render to update indices and time markers
+                        renderTimeline();
+                        document.dispatchEvent(new CustomEvent('programChanged', { detail: { ledIndex: State.currentlyViewedLedIndex } }));
                     }
                 }
             });
         }
 
-        // Time Marker Logic (after SortableJS is initialized on the wrapper)
-        // This ensures markers are added to the same wrapper that Sortable controls
+        // Time Markers
         let currentPixelOffset = 0;
         let actualCumulativeTime = 0;
-        steps.forEach((step) => { // We don't need 'index' here if just iterating for calculation
+        steps.forEach((step) => {
             let blockWidthPx;
-            if (step.duration_ms <= 2000) {
-                blockWidthPx = BLOCK_SIZE_SMALL_PX;
-            } else if (step.duration_ms <= 5000) {
-                blockWidthPx = BLOCK_SIZE_MEDIUM_PX;
-            } else {
-                blockWidthPx = BLOCK_SIZE_LARGE_PX;
-            }
-            // Add the margin-right of the block to the offset for the marker
-            currentPixelOffset += blockWidthPx + 5; // 5px is the margin-right from stepBlock.style.marginRight
+            if (step.duration_ms <= 2000) blockWidthPx = BLOCK_SIZE_SMALL_PX;
+            else if (step.duration_ms <= 5000) blockWidthPx = BLOCK_SIZE_MEDIUM_PX;
+            else blockWidthPx = BLOCK_SIZE_LARGE_PX;
+
+            currentPixelOffset += blockWidthPx + 5;
             actualCumulativeTime += step.duration_ms;
 
             const timeMarker = document.createElement('div');
-            timeMarker.className = 'timeline-time-marker'; // For filtering in Sortable and styling
+            timeMarker.className = 'timeline-time-marker';
             timeMarker.style.position = 'absolute';
-            timeMarker.style.left = `${currentPixelOffset - (blockWidthPx / 2) - 2}px`; // Attempt to center marker *between* blocks, or at end
-            // Or more simply, at the end: `${currentPixelOffset - 2}px`
-            timeMarker.style.left = `${currentPixelOffset - 2.5}px`; // -2.5 to be roughly at the end of margin
-            timeMarker.style.top = '5px'; // Position above the blocks (relative to timelineWrapper's padding-top)
-            timeMarker.style.height = 'calc(100% + 10px)'; // Span height of wrapper + a bit more
+            timeMarker.style.left = `${currentPixelOffset - 2.5}px`;
+            timeMarker.style.top = '5px';
+            timeMarker.style.height = 'calc(100% + 10px)';
             timeMarker.style.fontSize = '0.7em';
             timeMarker.style.borderLeft = '1px dotted #555';
             timeMarker.style.paddingLeft = '3px';
@@ -743,243 +263,424 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const exportButton = document.getElementById('export-button');
+    // ==========================================
+    // MODULE: IO
+    // ==========================================
+    function exportProgram() {
+        let hasAnySteps = false;
+        for (const ledKey in State.programData) {
+            if (State.programData[ledKey].length > 0) {
+                hasAnySteps = true; break;
+            }
+        }
+        if (!hasAnySteps) return alert("The program is empty. Add some steps before exporting.");
 
-    if (exportButton) {
-        exportButton.addEventListener('click', () => {
-            // Check if there's anything to export
-            let hasAnySteps = false;
-            for (const ledKey in programData) {
-                if (programData[ledKey].length > 0) {
-                    hasAnySteps = true;
-                    break;
+        const hoursInput = document.getElementById('run-time-hours');
+        const minutesInput = document.getElementById('run-time-minutes');
+        const secondsInput = document.getElementById('run-time-seconds');
+
+        let totalMinutes = 0;
+        if (hoursInput && minutesInput && secondsInput) {
+            const h = parseInt(hoursInput.value) || 0;
+            const m = parseInt(minutesInput.value) || 0;
+            const s = parseInt(secondsInput.value) || 0;
+            totalMinutes = (h * 60) + m + (s / 60);
+            totalMinutes = parseFloat(totalMinutes.toFixed(4));
+        }
+
+        const exportData = { ...State.programData, total_duration_minutes: totalMinutes };
+        const jsonString = JSON.stringify(exportData, null, 2);
+        const blob = new Blob([jsonString], { type: 'application/json' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'program.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(a.href);
+        console.log("Exported program.json with duration:", totalMinutes, "minutes");
+        alert("program.json has been exported!");
+    }
+
+    function loadProgram(file) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            try {
+                const loadedProgram = JSON.parse(e.target.result);
+                if (typeof loadedProgram !== 'object' || loadedProgram === null) throw new Error("Invalid JSON structure.");
+
+                const loadedTotalMinutes = loadedProgram.total_duration_minutes || 0;
+                delete loadedProgram.total_duration_minutes;
+
+                State.programData = loadedProgram;
+                console.log("Program loaded.");
+
+                const hoursInput = document.getElementById('run-time-hours');
+                const minutesInput = document.getElementById('run-time-minutes');
+                const secondsInput = document.getElementById('run-time-seconds');
+                if (hoursInput && minutesInput && secondsInput) {
+                    const totalSeconds = Math.round(loadedTotalMinutes * 60);
+                    hoursInput.value = Math.floor(totalSeconds / 3600);
+                    minutesInput.value = Math.floor((totalSeconds % 3600) / 60);
+                    secondsInput.value = totalSeconds % 60;
+                }
+                alert("Program loaded successfully!");
+                renderTimeline();
+                document.dispatchEvent(new CustomEvent('programLoaded'));
+            } catch (error) {
+                console.error("Error loading program:", error);
+                alert(`Error loading program: ${error.message}`);
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    // ==========================================
+    // MODULE: UI CONTROLS
+    // ==========================================
+
+    // Helpers
+    function createBtn(content, className, onClick) {
+        const btn = document.createElement('button');
+        if (typeof content === 'string') {
+            btn.textContent = content;
+            if (className) btn.className = className;
+        } else {
+            btn.innerHTML = `<span class="icon is-small"><i class="fas ${content.icon}"></i></span><span>${content.text}</span>`;
+            if (content.cls) btn.className = content.cls;
+        }
+        btn.addEventListener('click', onClick);
+        return btn;
+    }
+
+    function updateAllLedButtonAppearances(allLedButtons) {
+        allLedButtons.forEach(btn => {
+            const id = parseInt(btn.dataset.ledId);
+            btn.classList.remove('is-info', 'is-success', 'is-outlined');
+            if (id === State.currentlyViewedLedIndex) btn.classList.add('is-success');
+            else if (State.selectedLedIndices.has(id)) btn.classList.add('is-info');
+            else btn.classList.add('is-outlined');
+        });
+    }
+
+    function updateLedOutline(ledIndex, allLedButtons) {
+        const btn = allLedButtons[ledIndex];
+        if (State.programData[`LED${ledIndex}`].length > 0) btn.classList.add('has-program');
+        else btn.classList.remove('has-program');
+    }
+
+    function updateStepEditorForm() {
+        ['params-on', 'params-ramp', 'params-sine'].forEach(id => {
+            const d = document.getElementById(id);
+            if (d) d.style.display = 'none';
+        });
+        document.getElementById('params-duration').style.display = 'block';
+
+        const type = State.currentStepType;
+        if (type === 'ON') document.getElementById('params-on').style.display = 'block';
+        if (type === 'RAMP') document.getElementById('params-ramp').style.display = 'block';
+        if (type === 'SINE') document.getElementById('params-sine').style.display = 'block';
+    }
+
+    function initUI() {
+        const ledGridPane = document.getElementById('led-grid-pane');
+        const ledSelectionBoxContent = ledGridPane.querySelector('.box');
+
+        const placeholderText = ledSelectionBoxContent.querySelector('p');
+        if (placeholderText && placeholderText.textContent.includes('Loading grid...')) {
+            placeholderText.remove();
+        }
+
+        // LED Grid
+        const allLedButtons = [];
+        const gridContainer = document.createElement('div');
+        gridContainer.className = 'led-grid-actual mb-4';
+        gridContainer.style.display = 'grid';
+        gridContainer.style.gridTemplateColumns = `repeat(6, 1fr)`;
+        gridContainer.style.gap = '0.5rem';
+
+        for (let i = 0; i < NUM_LEDS; i++) {
+            const ledButton = document.createElement('button');
+            ledButton.className = 'button is-rounded is-outlined led-button';
+            ledButton.textContent = i + 1;
+            ledButton.dataset.ledId = i;
+
+            ledButton.addEventListener('click', (event) => {
+                const ledId = parseInt(ledButton.dataset.ledId);
+                const isCtrlClick = event.ctrlKey || event.metaKey;
+
+                if (isCtrlClick) {
+                    if (State.selectedLedIndices.has(ledId)) State.selectedLedIndices.delete(ledId);
+                    else State.selectedLedIndices.add(ledId);
+                } else {
+                    if (State.selectedLedIndices.has(ledId) && State.selectedLedIndices.size === 1) State.selectedLedIndices.clear();
+                    else {
+                        State.selectedLedIndices.clear();
+                        State.selectedLedIndices.add(ledId);
+                    }
+                }
+                State.currentlyViewedLedIndex = ledId;
+                updateAllLedButtonAppearances(allLedButtons);
+                renderTimeline();
+            });
+
+            gridContainer.appendChild(ledButton);
+            allLedButtons.push(ledButton);
+        }
+        ledSelectionBoxContent.appendChild(gridContainer);
+
+        // Action Buttons
+        const ledActionsContainer = document.createElement('div');
+        ledActionsContainer.className = 'field is-grouped is-grouped-multiline mt-4';
+
+        ledActionsContainer.appendChild(createBtn('Select All', 'button control', () => {
+            allLedButtons.forEach(btn => State.selectedLedIndices.add(parseInt(btn.dataset.ledId)));
+            updateAllLedButtonAppearances(allLedButtons);
+        }));
+
+        ledActionsContainer.appendChild(createBtn('Select None', 'button control', () => {
+            State.selectedLedIndices.clear();
+            updateAllLedButtonAppearances(allLedButtons);
+        }));
+
+        ledActionsContainer.appendChild(createBtn({ icon: 'fa-eraser', text: 'Clear Selected', cls: 'button is-warning control' }, null, () => {
+            if (State.selectedLedIndices.size === 0) return alert("Select LEDs first.");
+            if (!confirm(`Clear program for ${State.selectedLedIndices.size} LEDs?`)) return;
+            State.selectedLedIndices.forEach(idx => {
+                State.programData[`LED${idx}`] = [];
+                updateLedOutline(idx, allLedButtons);
+            });
+            if (State.currentlyViewedLedIndex !== null && State.selectedLedIndices.has(State.currentlyViewedLedIndex)) {
+                renderTimeline();
+            }
+        }));
+        ledSelectionBoxContent.appendChild(ledActionsContainer);
+
+        // Step Editor
+        const stepTypeButtons = document.querySelectorAll('.step-type-btn');
+        stepTypeButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                State.currentStepType = btn.dataset.value;
+                stepTypeButtons.forEach(b => b.classList.remove('is-selected', 'is-info'));
+                btn.classList.add('is-selected', 'is-info');
+                updateStepEditorForm();
+            });
+        });
+        updateStepEditorForm(); // Initial call
+
+        // Add Step
+        const addStepButton = document.getElementById('add-step-button');
+        if (addStepButton) {
+            addStepButton.addEventListener('click', () => {
+                if (State.selectedLedIndices.size === 0) return alert("Select LEDs first.");
+                const durationInput = document.getElementById('step-duration');
+                const dur = parseInt(durationInput.value);
+                if (isNaN(dur) || dur < 50) return alert("Duration must be >= 50ms");
+
+                const type = State.currentStepType;
+                let step = { type, duration_ms: dur };
+                const clamp = (val, max) => Math.max(0, Math.min(max, parseInt(val) || 0));
+
+                if (type === 'ON') step.int = clamp(document.getElementById('on-int').value, 1400);
+                else if (type === 'RAMP') {
+                    step.int0 = clamp(document.getElementById('ramp-int0').value, 1400);
+                    step.int1 = clamp(document.getElementById('ramp-int1').value, 1400);
+                } else if (type === 'SINE') {
+                    step.int0 = clamp(document.getElementById('sine-int0').value, 1400);
+                    step.int1 = clamp(document.getElementById('sine-int1').value, 1400);
+                    let f = parseFloat(document.getElementById('sine-freq').value) || 0;
+                    step.freq = Math.min(20, Math.max(0, f));
+                }
+
+                State.selectedLedIndices.forEach(idx => {
+                    State.programData[`LED${idx}`].push(step);
+                });
+                document.dispatchEvent(new CustomEvent('programChanged'));
+                renderTimeline();
+            });
+        }
+
+        // Export/Import
+        const exportButton = document.getElementById('export-button');
+        if (exportButton) exportButton.addEventListener('click', exportProgram);
+
+        const loadButton = document.getElementById('load-program-button');
+        const fileInput = document.getElementById('file-input');
+        if (loadButton && fileInput) {
+            loadButton.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => {
+                if (e.target.files[0]) {
+                    loadProgram(e.target.files[0]);
+                    e.target.value = '';
+                }
+            });
+        }
+
+        // --- DARK MODE LOGIC ---
+        const darkModeToggleButton = document.getElementById('darkModeToggle');
+        const htmlElement = document.documentElement;
+
+        function applyTheme(theme) {
+            if (theme === 'dark') {
+                htmlElement.classList.add('dark-mode');
+                if (darkModeToggleButton) {
+                    darkModeToggleButton.querySelector('i').classList.remove('fa-moon');
+                    darkModeToggleButton.querySelector('i').classList.add('fa-sun');
+                }
+            } else {
+                htmlElement.classList.remove('dark-mode');
+                if (darkModeToggleButton) {
+                    darkModeToggleButton.querySelector('i').classList.remove('fa-sun');
+                    darkModeToggleButton.querySelector('i').classList.add('fa-moon');
                 }
             }
-
-            if (!hasAnySteps) {
-                alert("The program is empty. Add some steps before exporting.");
-                return;
-            }
-
-            // The programData should already be in the correct format:
-            // { "LED0": [...steps...], "LED1": [...steps...], ... }
-
-            // Get total duration from input field
-            const totalDurationInput = document.getElementById('total-duration');
-            const totalDurationMinutes = parseInt(totalDurationInput ? totalDurationInput.value : 0) || 0;
-
-            // Create export object with LED data and global settings
-            const exportData = { ...programData, total_duration_minutes: totalDurationMinutes };
-
-            // Convert the programData object to a JSON string
-            // The 'null, 2' arguments pretty-print the JSON with an indent of 2 spaces
-            const jsonString = JSON.stringify(exportData, null, 2);
-
-            // Create a Blob with the JSON string
-            const blob = new Blob([jsonString], { type: 'application/json' });
-
-            // Create a temporary anchor element (<a>) to trigger the download
-            const a = document.createElement('a');
-            a.href = URL.createObjectURL(blob); // Set the href to a URL representing the Blob
-            a.download = 'program.json';     // Set the desired filename for the download
-
-            // Append the anchor to the body, click it, then remove it
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-
-            // Revoke the object URL to free up resources
-            URL.revokeObjectURL(a.href);
-
-            console.log("program.json exported.");
-            alert("program.json has been prepared for download!");
-        });
-    }
-
-    console.log('Export button initialized!')
-
-    const loadProgramButton = document.getElementById('load-program-button');
-    const fileInput = document.getElementById('file-input');
-
-    if (loadProgramButton && fileInput) {
-        loadProgramButton.addEventListener('click', () => {
-            fileInput.click(); // Programmatically click the hidden file input
-        });
-
-        fileInput.addEventListener('change', (event) => {
-            const file = event.target.files[0]; // Get the selected file
-
-            if (file) {
-                const reader = new FileReader();
-
-                reader.onload = (e) => {
-                    try {
-                        const fileContent = e.target.result;
-                        const loadedProgram = JSON.parse(fileContent);
-
-                        // --- Basic Validation of loadedProgram structure ---
-                        if (typeof loadedProgram !== 'object' || loadedProgram === null) {
-                            throw new Error("Invalid JSON structure: not an object.");
-                        }
-                        let isValidStructure = true;
-                        for (let i = 0; i < NUM_LEDS; i++) {
-                            const ledKey = `LED${i}`;
-                            if (!loadedProgram.hasOwnProperty(ledKey) || !Array.isArray(loadedProgram[ledKey])) {
-                                isValidStructure = false;
-                                break;
-                            }
-                            // Further validation: check if each item in the array is a valid step object
-                            loadedProgram[ledKey].forEach(step => {
-                                if (typeof step !== 'object' || step === null || !step.type || !step.hasOwnProperty('duration_ms')) {
-                                    // Add more checks for type-specific params if needed
-                                    isValidStructure = false;
-                                }
-                            });
-                            if (!isValidStructure) break;
-                        }
-
-                        if (!isValidStructure) {
-                            throw new Error("Loaded program.json has an invalid or incomplete structure for some LEDs.");
-                        }
-
-                        // If valid, replace current programData
-                        // Extract total_duration_minutes if present
-                        const loadedTotalDuration = loadedProgram.total_duration_minutes || 0;
-                        delete loadedProgram.total_duration_minutes; // Remove from programData, keep only LED keys
-
-                        programData = loadedProgram;
-
-                        // Update the total duration input field
-                        const totalDurationInput = document.getElementById('total-duration');
-                        if (totalDurationInput) {
-                            totalDurationInput.value = loadedTotalDuration;
-                        }
-
-                        console.log("Program loaded successfully:", JSON.parse(JSON.stringify(programData)));
-                        console.log("Total duration loaded:", loadedTotalDuration, "minutes");
-                        alert("Program loaded successfully!");
-
-                        // Refresh UI elements
-                        // 1. Potentially clear/update selectedLedIndices (or decide on behavior)
-                        //    For now, let's keep current selection, timeline will update for viewed LED.
-                        // selectedLedIndices.clear(); // Optional: clear selection
-                        // allLedButtons.forEach(btn => updateLedButtonAppearance(btn, false)); // Optional: update UI
-                        renderTimeline();
-                        updateAllLedOutlines();
-                        // (Future) If you were saving/loading LED selection states, update those too.
-
-                    } catch (error) {
-                        console.error("Error loading or parsing program.json:", error);
-                        alert(`Error loading program.json: ${error.message}`);
-                    } finally {
-                        // Reset file input to allow loading the same file again if needed
-                        fileInput.value = '';
-                    }
-                };
-
-                reader.onerror = (error) => {
-                    console.error("Error reading file:", error);
-                    alert("Error reading file.");
-                    fileInput.value = ''; // Reset
-                };
-
-                reader.readAsText(file); // Read the file as plain text
-            }
-        });
-    }
-    // --- Copy Program Function ---
-    function handleCopyProgram() {
-        if (selectedLedIndices.size < 2) {
-            alert("Please select at least 2 LEDs (source + targets)");
-            return;
         }
 
-        // Get the last selected LED as source (using Array.from gives insertion order)
-        const selectedArray = Array.from(selectedLedIndices);
-        const sourceLedIndex = selectedArray[selectedArray.length - 1];
-        const sourceProgram = programData[`LED${sourceLedIndex}`];
-
-        if (!sourceProgram || sourceProgram.length === 0) {
-            alert("Source LED has no program to copy");
-            return;
+        if (darkModeToggleButton) {
+            darkModeToggleButton.addEventListener('click', () => {
+                const currentTheme = htmlElement.classList.contains('dark-mode') ? 'dark' : 'light';
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                applyTheme(newTheme);
+                localStorage.setItem('theme', newTheme);
+            });
         }
 
-        // Clone the program for each selected LED (excluding source)
-        selectedArray.forEach(ledIndex => {
-            if (ledIndex !== sourceLedIndex) {
-                programData[`LED${ledIndex}`] = JSON.parse(JSON.stringify(sourceProgram));
-                updateLedProgramOutline(ledIndex);
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme) applyTheme(savedTheme);
+        else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) applyTheme('dark');
+        else applyTheme('light');
+
+        // Events
+        document.addEventListener('programChanged', (e) => {
+            if (e.detail && e.detail.ledIndex !== undefined) updateLedOutline(e.detail.ledIndex, allLedButtons);
+            else allLedButtons.forEach((_, idx) => updateLedOutline(idx, allLedButtons));
+        });
+        document.addEventListener('programLoaded', () => {
+            allLedButtons.forEach((_, idx) => updateLedOutline(idx, allLedButtons));
+            // Also update the time picker display when loading
+            updateTimePickerDisplay();
+        });
+
+        // ==========================================
+        // TIME PICKER MODAL
+        // ==========================================
+        const timePickerDisplay = document.getElementById('time-picker-display');
+        const timePickerModal = document.getElementById('time-picker-modal');
+        const timeDisplayText = document.getElementById('time-display-text');
+        const spinnerHours = document.getElementById('spinner-hours');
+        const spinnerMinutes = document.getElementById('spinner-minutes');
+        const spinnerSeconds = document.getElementById('spinner-seconds');
+        const hiddenHours = document.getElementById('run-time-hours');
+        const hiddenMinutes = document.getElementById('run-time-minutes');
+        const hiddenSeconds = document.getElementById('run-time-seconds');
+        const confirmBtn = document.getElementById('time-picker-confirm');
+        const cancelBtn = document.getElementById('time-picker-cancel');
+
+        // Temp values while modal is open
+        let tempHours = 0, tempMinutes = 0, tempSeconds = 0;
+
+        function pad(n) { return n.toString().padStart(2, '0'); }
+
+        function updateTimePickerDisplay() {
+            const h = parseInt(hiddenHours.value) || 0;
+            const m = parseInt(hiddenMinutes.value) || 0;
+            const s = parseInt(hiddenSeconds.value) || 0;
+            timeDisplayText.textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
+        }
+
+        function openModal() {
+            tempHours = parseInt(hiddenHours.value) || 0;
+            tempMinutes = parseInt(hiddenMinutes.value) || 0;
+            tempSeconds = parseInt(hiddenSeconds.value) || 0;
+            spinnerHours.value = pad(tempHours);
+            spinnerMinutes.value = pad(tempMinutes);
+            spinnerSeconds.value = pad(tempSeconds);
+            timePickerModal.classList.add('is-active');
+        }
+
+        function closeModal() {
+            timePickerModal.classList.remove('is-active');
+        }
+
+        function confirmTime() {
+            // Read from inputs in case user typed directly
+            tempHours = Math.max(0, Math.min(99, parseInt(spinnerHours.value) || 0));
+            tempMinutes = Math.max(0, Math.min(59, parseInt(spinnerMinutes.value) || 0));
+            tempSeconds = Math.max(0, Math.min(59, parseInt(spinnerSeconds.value) || 0));
+
+            hiddenHours.value = tempHours;
+            hiddenMinutes.value = tempMinutes;
+            hiddenSeconds.value = tempSeconds;
+            updateTimePickerDisplay();
+            closeModal();
+        }
+
+        // Spinner button handling
+        function adjustValue(unit, direction) {
+            // First read current value from input
+            if (unit === 'hours') {
+                tempHours = parseInt(spinnerHours.value) || 0;
+                tempHours += direction;
+                if (tempHours < 0) tempHours = 99;
+                if (tempHours > 99) tempHours = 0;
+                spinnerHours.value = pad(tempHours);
+            } else if (unit === 'minutes') {
+                tempMinutes = parseInt(spinnerMinutes.value) || 0;
+                tempMinutes += direction;
+                if (tempMinutes < 0) tempMinutes = 59;
+                if (tempMinutes > 59) tempMinutes = 0;
+                spinnerMinutes.value = pad(tempMinutes);
+            } else if (unit === 'seconds') {
+                tempSeconds = parseInt(spinnerSeconds.value) || 0;
+                tempSeconds += direction;
+                if (tempSeconds < 0) tempSeconds = 59;
+                if (tempSeconds > 59) tempSeconds = 0;
+                spinnerSeconds.value = pad(tempSeconds);
+            }
+        }
+
+        // Event Listeners
+        if (timePickerDisplay) {
+            timePickerDisplay.addEventListener('click', openModal);
+        }
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', confirmTime);
+        }
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', closeModal);
+        }
+
+        // Spinner buttons
+        document.querySelectorAll('.time-spinner-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const unit = btn.dataset.unit;
+                const direction = btn.classList.contains('up') ? 1 : -1;
+                adjustValue(unit, direction);
+            });
+        });
+
+        // Close on Escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && timePickerModal.classList.contains('is-active')) {
+                closeModal();
             }
         });
 
-        // Show notification
-        const notification = document.createElement('div');
-        notification.className = 'notification is-info is-light';
-        notification.textContent = `Program copied from LED ${sourceLedIndex + 1} to ${selectedIndices.size - 1} LED(s)`;
-        document.body.appendChild(notification);
-        setTimeout(() => notification.remove(), 3000);
-
-        // Refresh timeline if viewing one of the target LEDs
-        if (currentlyViewedLedIndex !== null && selectedLedIndices.has(currentlyViewedLedIndex) && currentlyViewedLedIndex !== sourceLedIndex) {
-            renderTimeline();
-        }
-    }
-
-    console.log('Copy Program button initialized!');
-
-    console.log('Load Program button initialized!');
-    // --- Dark Mode Toggle Logic ---
-    const darkModeToggleButton = document.getElementById('darkModeToggle');
-    const htmlElement = document.documentElement; // Get the <html> element
-
-    // Function to apply theme based on preference
-    function applyTheme(theme) {
-        if (theme === 'dark') {
-            htmlElement.classList.add('dark-mode');
-            if (darkModeToggleButton) { // Update button icon/text if needed
-                darkModeToggleButton.querySelector('i').classList.remove('fa-moon');
-                darkModeToggleButton.querySelector('i').classList.add('fa-sun');
-            }
-        } else {
-            htmlElement.classList.remove('dark-mode');
-            if (darkModeToggleButton) {
-                darkModeToggleButton.querySelector('i').classList.remove('fa-sun');
-                darkModeToggleButton.querySelector('i').classList.add('fa-moon');
-            }
-        }
-    }
-
-    if (darkModeToggleButton) {
-        darkModeToggleButton.addEventListener('click', () => {
-            let currentTheme = 'light';
-            if (htmlElement.classList.contains('dark-mode')) {
-                currentTheme = 'dark';
-            }
-
-            if (currentTheme === 'dark') {
-                applyTheme('light');
-                localStorage.setItem('theme', 'light'); // Save preference
-            } else {
-                applyTheme('dark');
-                localStorage.setItem('theme', 'dark'); // Save preference
+        // Close on overlay click (outside modal box)
+        timePickerModal.addEventListener('click', (e) => {
+            if (e.target === timePickerModal) {
+                closeModal();
             }
         });
+
+        // Initialize display
+        updateTimePickerDisplay();
     }
 
-    // Check for saved theme preference on page load
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) {
-        applyTheme(savedTheme);
-    } else {
-        // Optional: Check for OS preference if no user preference saved
-        if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
-            applyTheme('dark');
-        } else {
-            applyTheme('light'); // Default to light
-        }
-    }
-    console.log('Dark mode toggle initialized!');
-    // Initial render on page load (will show "No LED selected" message)
+    // ==========================================
+    // INITIALIZATION
+    // ==========================================
+    initState();
+    initUI();
     renderTimeline();
-    console.log('Timeline rendering initialized!');
 });

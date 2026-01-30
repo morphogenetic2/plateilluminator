@@ -15,7 +15,8 @@
     text-align: center;
     box-sizing: border-box;
     position: relative;
-    word-break: break-word; /* Helps with text fitting */
+    word-break: break-word;
+    /* Helps with text fitting */
     /* margin-right: 5px; /* Now set in JS for consistent spacing with markers */
 }
 
@@ -27,38 +28,52 @@
 /* Dark mode specific for timeline blocks if needed */
 html.dark-mode .timeline-step-block {
     border-color: #4a4a4a;
-    color: #333; /* Text color for light backgrounds on blocks */
+    color: #333;
+    /* Text color for light backgrounds on blocks */
 }
+
 html.dark-mode #timeline-display {
-    background-color: #2e2e2e; /* Or your chosen dark mode background */
+    background-color: #2e2e2e;
+    /* Or your chosen dark mode background */
     border-color: #444;
 }
+
 html.dark-mode #timeline-display p {
     color: #ccc;
 }
+
 html.dark-mode .timeline-time-marker {
     color: #ddd;
     border-left-color: #777;
 }
+
 /* Dark mode overrides for step block backgrounds (same as before) */
 html.dark-mode .timeline-step-block[style*="background-color: lightgreen"] {
-    background-color: #204020 !important; color: #c8e6c9 !important;
+    background-color: #204020 !important;
+    color: #c8e6c9 !important;
 }
+
 html.dark-mode .timeline-step-block[style*="background-color: lightcoral"] {
-    background-color: #502020 !important; color: #ffcdd2 !important;
+    background-color: #502020 !important;
+    color: #ffcdd2 !important;
 }
+
 html.dark-mode .timeline-step-block[style*="background-color: lightskyblue"] {
-    background-color: #103050 !important; color: #b3e5fc !important;
+    background-color: #103050 !important;
+    color: #b3e5fc !important;
 }
+
 html.dark-mode .timeline-step-block[style*="background-color: lightgoldenrodyellow"] {
-    background-color: #505020 !important; color: #fff9c4 !important;
+    background-color: #505020 !important;
+    color: #fff9c4 !important;
 }
 
 
 /* --- Dark Mode Base --- */
 html.dark-mode {
     background-color: #1e1e1e;
-    color: #e0e0e0; /* Slightly off-white for better readability */
+    color: #e0e0e0;
+    /* Slightly off-white for better readability */
 }
 
 html.dark-mode body {
@@ -68,34 +83,41 @@ html.dark-mode body {
 html.dark-mode .box {
     background-color: #2a2a2a;
     /* color: #e0e0e0; /* Inherits from body or html.dark-mode */
-    border-color: #444; /* Darker border for boxes */
+    border-color: #444;
+    /* Darker border for boxes */
 }
 
 html.dark-mode .title,
 html.dark-mode .subtitle,
 html.dark-mode .label {
-    color: #f0f0f0; /* Brighter white for prominent text */
+    color: #f0f0f0;
+    /* Brighter white for prominent text */
 }
 
 /* --- Dark Mode for Form Elements --- */
 html.dark-mode .input,
 html.dark-mode .select select,
-html.dark-mode textarea { /* If you add textareas later */
+html.dark-mode textarea {
+    /* If you add textareas later */
     background-color: #3a3a3a;
     border-color: #555555;
     color: #e0e0e0;
 }
+
 html.dark-mode .input::placeholder,
 html.dark-mode textarea::placeholder {
-    color: #888; /* Lighter placeholder text */
+    color: #888;
+    /* Lighter placeholder text */
 }
 
 /* --- Dark Mode for Buttons --- */
-html.dark-mode .button:not([class*="is-"]) { /* Default button */
+html.dark-mode .button:not([class*="is-"]) {
+    /* Default button */
     background-color: #3a3a3a;
     border-color: #555555;
     color: #e0e0e0;
 }
+
 html.dark-mode .button:not([class*="is-"]):hover {
     background-color: #4a4a4a;
     border-color: #666666;
@@ -103,11 +125,15 @@ html.dark-mode .button:not([class*="is-"]):hover {
 
 html.dark-mode .button.is-outlined {
     background-color: transparent;
-    border-color: #555555; /* Or a theme color */
-    color: #e0e0e0; /* Or a theme color */
+    border-color: #555555;
+    /* Or a theme color */
+    color: #e0e0e0;
+    /* Or a theme color */
 }
+
 html.dark-mode .button.is-outlined:hover {
-    background-color: rgba(200, 200, 200, 0.1); /* Slight hover for outlined */
+    background-color: rgba(200, 200, 200, 0.1);
+    /* Slight hover for outlined */
 }
 
 /* Keep Bulma's intent for colored buttons (is-primary, is-info, etc.) */
@@ -118,6 +144,7 @@ html.dark-mode .button.is-info {
     /* border-color: transparent; */
     /* color: #fff; */
 }
+
 /* Example for is-success */
 html.dark-mode .button.is-success {
     /* background-color: #38761d; /* Darker shade of success */
@@ -130,34 +157,266 @@ html.dark-mode #timeline-display {
     background-color: #2e2e2e;
     border-color: #444;
 }
-html.dark-mode #timeline-display p { /* Placeholder text in timeline */
+
+html.dark-mode #timeline-display p {
+    /* Placeholder text in timeline */
     color: #aaa;
 }
-html.dark-mode .timeline-step-block { /* Default if not overridden by type-specific */
+
+html.dark-mode .timeline-step-block {
+    /* Default if not overridden by type-specific */
     border-color: #4a4a4a;
-    color: #333; /* Text for light backgrounds on blocks */
+    color: #333;
+    /* Text for light backgrounds on blocks */
 }
+
 html.dark-mode .timeline-time-marker {
     color: #ddd;
     border-left-color: #777;
 }
+
 html.dark-mode .timeline-step-block[style*="background-color: lightgreen"] {
-    background-color: #2a522a !important; color: #c8e6c9 !important;
+    background-color: #2a522a !important;
+    color: #c8e6c9 !important;
 }
+
 html.dark-mode .timeline-step-block[style*="background-color: lightcoral"] {
-    background-color: #6b2f2f !important; color: #ffcdd2 !important;
+    background-color: #6b2f2f !important;
+    color: #ffcdd2 !important;
 }
+
 html.dark-mode .timeline-step-block[style*="background-color: lightskyblue"] {
-    background-color: #2a4e6f !important; color: #b3e5fc !important;
+    background-color: #2a4e6f !important;
+    color: #b3e5fc !important;
 }
+
 html.dark-mode .timeline-step-block[style*="background-color: lightgoldenrodyellow"] {
-    background-color: #706522 !important; color: #fff9c4 !important;
+    background-color: #706522 !important;
+    color: #fff9c4 !important;
 }
+
 html.dark-mode .timeline-step-block[style*="background-color: lightgrey"] {
-    background-color: #4d4d4d !important; color: #f0f0f0 !important;
+    background-color: #4d4d4d !important;
+    color: #f0f0f0 !important;
 }
 
 /* --- Dark Mode for Horizontal Rule --- */
 html.dark-mode hr {
     background-color: #444;
+}
+
+/* ==========================================
+   TIME PICKER MODAL
+   ========================================== */
+
+/* Clickable Time Display Button */
+.time-picker-display {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    font-size: 1.5rem;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.time-picker-display:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.5);
+}
+
+.time-picker-display:active {
+    transform: translateY(0);
+}
+
+.time-picker-display .icon {
+    font-size: 1.2rem;
+}
+
+/* Modal Overlay */
+.time-picker-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s, visibility 0.3s;
+}
+
+.time-picker-modal-overlay.is-active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Modal Box */
+.time-picker-modal {
+    background: white;
+    border-radius: 16px;
+    padding: 2rem;
+    min-width: 360px;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    transform: scale(0.9);
+    transition: transform 0.3s;
+}
+
+.time-picker-modal-overlay.is-active .time-picker-modal {
+    transform: scale(1);
+}
+
+.time-picker-modal h3 {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    font-size: 1.25rem;
+    color: #333;
+}
+
+/* Spinners Container */
+.time-spinners {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Individual Spinner */
+.time-spinner {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.time-spinner-btn {
+    width: 60px;
+    height: 36px;
+    border: none;
+    background: #f0f0f0;
+    color: #555;
+    font-size: 1.2rem;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.time-spinner-btn:hover {
+    background: #667eea;
+    color: white;
+}
+
+.time-spinner-btn.up {
+    border-radius: 8px 8px 0 0;
+}
+
+.time-spinner-btn.down {
+    border-radius: 0 0 8px 8px;
+}
+
+.time-spinner-value {
+    width: 60px;
+    height: 50px;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-size: 1.8rem;
+    font-weight: bold;
+    font-family: 'Courier New', monospace;
+    background: #fafafa;
+    border: none;
+    border-left: 2px solid #eee;
+    border-right: 2px solid #eee;
+    color: #333;
+    text-align: center;
+    -moz-appearance: textfield;
+    /* Hide spinner arrows in Firefox */
+}
+
+.time-spinner-value::-webkit-outer-spin-button,
+.time-spinner-value::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.time-spinner-value:focus {
+    outline: 2px solid #667eea;
+    background: #fff;
+}
+
+/* Separator between spinners */
+.time-separator {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #999;
+    padding: 0 0.25rem;
+}
+
+/* Labels under spinners */
+.time-spinner-label {
+    font-size: 0.75rem;
+    color: #888;
+    margin-top: 0.5rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+/* Modal Buttons */
+.time-picker-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1.5rem;
+}
+
+.time-picker-buttons .button {
+    min-width: 100px;
+}
+
+/* Dark Mode for Time Picker */
+html.dark-mode .time-picker-display {
+    background: linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%);
+    box-shadow: 0 4px 15px rgba(90, 103, 216, 0.4);
+}
+
+html.dark-mode .time-picker-modal {
+    background: #2a2a2a;
+}
+
+html.dark-mode .time-picker-modal h3 {
+    color: #f0f0f0;
+}
+
+html.dark-mode .time-spinner-btn {
+    background: #3a3a3a;
+    color: #ccc;
+}
+
+html.dark-mode .time-spinner-btn:hover {
+    background: #5a67d8;
+    color: white;
+}
+
+html.dark-mode .time-spinner-value {
+    background: #333;
+    border-color: #444;
+    color: #f0f0f0;
+}
+
+html.dark-mode .time-separator {
+    color: #666;
+}
+
+html.dark-mode .time-spinner-label {
+    color: #888;
 }
