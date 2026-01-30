@@ -708,9 +708,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
             // The programData should already be in the correct format:
             // { "LED0": [...steps...], "LED1": [...steps...], ... }
+
+            // Get total duration from input field
+            const totalDurationInput = document.getElementById('total-duration');
+            const totalDurationMinutes = parseInt(totalDurationInput ? totalDurationInput.value : 0) || 0;
+
+            // Create export object with LED data and global settings
+            const exportData = { ...programData, total_duration_minutes: totalDurationMinutes };
+
             // Convert the programData object to a JSON string
             // The 'null, 2' arguments pretty-print the JSON with an indent of 2 spaces
-            const jsonString = JSON.stringify(programData, null, 2);
+            const jsonString = JSON.stringify(exportData, null, 2);
 
             // Create a Blob with the JSON string
             const blob = new Blob([jsonString], { type: 'application/json' });
@@ -780,8 +788,20 @@ document.addEventListener('DOMContentLoaded', () => {
                         }
 
                         // If valid, replace current programData
+                        // Extract total_duration_minutes if present
+                        const loadedTotalDuration = loadedProgram.total_duration_minutes || 0;
+                        delete loadedProgram.total_duration_minutes; // Remove from programData, keep only LED keys
+
                         programData = loadedProgram;
+
+                        // Update the total duration input field
+                        const totalDurationInput = document.getElementById('total-duration');
+                        if (totalDurationInput) {
+                            totalDurationInput.value = loadedTotalDuration;
+                        }
+
                         console.log("Program loaded successfully:", JSON.parse(JSON.stringify(programData)));
+                        console.log("Total duration loaded:", loadedTotalDuration, "minutes");
                         alert("Program loaded successfully!");
 
                         // Refresh UI elements
