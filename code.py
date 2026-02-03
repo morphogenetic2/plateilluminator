@@ -54,9 +54,9 @@ class StepType:
     RAMP = "RAMP"
     SINE = "SINE"
 
-class LEDChunk:
+class LEDblock:
     """
-    Represents a chunk (sequence) of steps with repeat logic.
+    Represents a block (sequence) of steps with repeat logic.
     """
     def __init__(self, steps, repeat_duration_minutes=None, repeat_count=None):
         self.steps = steps
@@ -65,24 +65,24 @@ class LEDChunk:
         
         self.current_step_index = 0
         self.elapsed_in_step = 0  # ms
-        self.chunk_start_time = 0  # Will be set when chunk becomes active
+        self.block_start_time = 0  # Will be set when block becomes active
         self.repetition_count = 0  # How many times we've completed the step sequence
         
     def reset(self, current_time_ms):
-        """Reset chunk to initial state."""
+        """Reset block to initial state."""
         self.current_step_index = 0
         self.elapsed_in_step = 0
-        self.chunk_start_time = current_time_ms
+        self.block_start_time = current_time_ms
         self.repetition_count = 0
         
     def is_complete(self, current_time_ms):
-        """Check if this chunk has finished all its repetitions."""
+        """Check if this block has finished all its repetitions."""
         if not self.steps:
             return True
             
         # Check duration-based completion
         if self.repeat_duration_minutes is not None and self.repeat_duration_minutes > 0:
-            elapsed_minutes = (current_time_ms - self.chunk_start_time) / 60000.0
+            elapsed_minutes = (current_time_ms - self.block_start_time) / 60000.0
             if elapsed_minutes >= self.repeat_duration_minutes:
                 return True
                 
@@ -91,7 +91,7 @@ class LEDChunk:
             if self.repetition_count >= self.repeat_count:
                 return True
                 
-        # If neither repeat setting, chunk completes after one cycle
+        # If neither repeat setting, block completes after one cycle
         if self.repeat_duration_minutes is None and self.repeat_count is None:
             if self.repetition_count >= 1:
                 return True
@@ -100,7 +100,7 @@ class LEDChunk:
         
     def update_step(self, dt_ms):
         """
-        Update the current step within this chunk.
+        Update the current step within this block.
         Returns the current intensity.
         """
         if not self.steps:
@@ -151,56 +151,56 @@ class LEDChunk:
 
 class LEDProgram:
     """
-    Handles chunk-based program execution for one LED.
+    Handles block-based program execution for one LED.
     """
-    def __init__(self, chunks, led_index):
-        self.chunks = chunks
+    def __init__(self, blocks, led_index):
+        self.blocks = blocks
         self.led_index = led_index
-        self.current_chunk_index = 0
+        self.current_block_index = 0
         self.current_intensity = 0  # µW/cm²
         self.program_start_time = 0
         
-        # Initialize first chunk
-        if self.chunks:
-            self.chunks[0].reset(0)
+        # Initialize first block
+        if self.blocks:
+            self.blocks[0].reset(0)
 
     def update(self, dt_ms, current_time_ms):
         """
         Update the LED's state based on elapsed time.
-        Now handles chunk transitions.
+        Now handles block transitions.
         """
-        if not self.chunks:
+        if not self.blocks:
             self.current_intensity = 0
             return 0
             
-        # Get current chunk
-        if self.current_chunk_index >= len(self.chunks):
-            # All chunks complete - turn off
+        # Get current block
+        if self.current_block_index >= len(self.blocks):
+            # All blocks complete - turn off
             self.current_intensity = 0
             return 0
             
-        current_chunk = self.chunks[self.current_chunk_index]
+        current_block = self.blocks[self.current_block_index]
         
-        # Check if current chunk is complete
-        if current_chunk.is_complete(current_time_ms):
-            # Move to next chunk
-            self.current_chunk_index += 1
+        # Check if current block is complete
+        if current_block.is_complete(current_time_ms):
+            # Move to next block
+            self.current_block_index += 1
             
-            if self.current_chunk_index >= len(self.chunks):
-                # All chunks complete
+            if self.current_block_index >= len(self.blocks):
+                # All blocks complete
                 self.current_intensity = 0
                 return 0
             else:
-                # Initialize next chunk
-                self.chunks[self.current_chunk_index].reset(current_time_ms)
-                current_chunk = self.chunks[self.current_chunk_index]
+                # Initialize next block
+                self.blocks[self.current_block_index].reset(current_time_ms)
+                current_block = self.blocks[self.current_block_index]
         
-        # Update current chunk and get intensity
-        self.current_intensity = current_chunk.update_step(dt_ms)
+        # Update current block and get intensity
+        self.current_intensity = current_block.update_step(dt_ms)
         return self.current_intensity
 
 # -----------------------
-# Load Program Data and Convert to Chunks
+# Load Program Data and Convert to blocks
 # -----------------------
 try:
     with open("/program.json", "r") as f:
@@ -209,38 +209,38 @@ except OSError:
     print("No program.json found. Defaulting to all LEDs OFF.")
     program_data = {}
 
-def convert_to_chunks(led_data):
+def convert_to_blocks(led_data):
     """
-    Convert LED program data to chunk format.
-    Supports both legacy (array of steps) and new (chunks) formats.
+    Convert LED program data to block format.
+    Supports both legacy (array of steps) and new (blocks) formats.
     """
     if not led_data:
         return []
         
-    # Check if already in chunk format
-    if isinstance(led_data, dict) and "chunks" in led_data:
-        # New format: convert chunk data to LEDChunk objects
-        chunks = []
-        for chunk_data in led_data["chunks"]:
-            steps = chunk_data.get("steps", [])
-            repeat_duration = chunk_data.get("repeat_duration_minutes")
-            repeat_count = chunk_data.get("repeat_count")
-            chunks.append(LEDChunk(steps, repeat_duration, repeat_count))
-        return chunks
+    # Check if already in block format
+    if isinstance(led_data, dict) and "blocks" in led_data:
+        # New format: convert block data to LEDblock objects
+        blocks = []
+        for block_data in led_data["blocks"]:
+            steps = block_data.get("steps", [])
+            repeat_duration = block_data.get("repeat_duration_minutes")
+            repeat_count = block_data.get("repeat_count")
+            blocks.append(LEDblock(steps, repeat_duration, repeat_count))
+        return blocks
     elif isinstance(led_data, list):
-        # Legacy format: convert entire step array to single chunk
-        # This chunk repeats until global timeout (handled by main loop)
-        print("Legacy format detected - converting to single repeating chunk")
-        return [LEDChunk(led_data, repeat_duration_minutes=None, repeat_count=None)]
+        # Legacy format: convert entire step array to single block
+        # This block repeats until global timeout (handled by main loop)
+        print("Legacy format detected - converting to single repeating block")
+        return [LEDblock(led_data, repeat_duration_minutes=None, repeat_count=None)]
     else:
         return []
 
-# Create LED programs using chunk conversion
+# Create LED programs using block conversion
 led_programs = []
 for i in range(NUM_CHANNELS):
     led_key = f"LED{i}"
-    chunks = convert_to_chunks(program_data.get(led_key, []))
-    led_programs.append(LEDProgram(chunks, i))
+    blocks = convert_to_blocks(program_data.get(led_key, []))
+    led_programs.append(LEDProgram(blocks, i))
 
 # -----------------------
 # Dynamic Tick Calculation
@@ -253,9 +253,9 @@ min_duration = float("inf")
 animation_led_indices = set()  # Track LEDs with SINE/RAMP steps
 
 for i in range(NUM_CHANNELS):
-    chunks = led_programs[i].chunks
-    for chunk in chunks:
-        for step in chunk.steps:
+    blocks = led_programs[i].blocks
+    for block in blocks:
+        for step in block.steps:
             dur = step.get("duration_ms", 0)
             s_type = step.get("type", "OFF")
             
@@ -318,7 +318,7 @@ while True:
             else:
                  # BUGFIX: Pass actual elapsed time, not target TICK_MS
                  # This ensures SINE/RAMP calculations use real-world timing
-                 # Also pass current time for chunk completion tracking
+                 # Also pass current time for block completion tracking
                  uw_intensity = led_programs[i].update(elapsed, now)  # µW/cm²
             
             led[i] = uw_cm2_to_pwm(uw_intensity, i)  # Set PWM directly (12-bit)
@@ -328,4 +328,5 @@ while True:
 
     # Small sleep to avoid high CPU usage
     time.sleep(SLEEP)
+
 

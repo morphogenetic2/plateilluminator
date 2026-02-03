@@ -389,8 +389,8 @@ input.compact-input {
     opacity: 0.7;
 }
 
-/* Chunk Groups in Timeline */
-.chunk-group {
+/* block Groups in Timeline */
+.block-group {
     background: var(--bg-input);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-md);
@@ -401,17 +401,17 @@ input.compact-input {
     transition: all 0.2s;
 }
 
-.chunk-group:hover {
+.block-group:hover {
     border-color: var(--primary);
 }
 
-.chunk-group.active {
+.block-group.active {
     border-color: var(--primary);
     box-shadow: 0 0 0 1px var(--primary);
     background: rgba(99, 102, 241, 0.1);
 }
 
-.chunk-label {
+.block-label {
     font-size: 0.7rem;
     font-weight: 700;
     color: var(--text-muted);
@@ -422,7 +422,7 @@ input.compact-input {
     justify-content: space-between;
 }
 
-.chunk-steps {
+.block-steps {
     display: flex;
     gap: 4px;
 }
