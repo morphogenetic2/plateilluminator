@@ -15,6 +15,20 @@ document.addEventListener('DOMContentLoaded', () => {
         clipboard: null, // For copy/paste LED programs
     };
 
+    const DragSelect = {
+        active: false,
+        hasMoved: false,
+        ignoreClick: false,
+        startX: 0,
+        startY: 0,
+        additive: false,
+        originSelection: new Set(),
+        lastHitLedIndex: null,
+        boxEl: null,
+        containerEl: null,
+        gridEl: null,
+    };
+
     function pushHistory() {
         if (State.history.length > 50) State.history.shift(); // Limit size
         State.history.push(JSON.stringify(State.programData));
@@ -489,6 +503,140 @@ document.addEventListener('DOMContentLoaded', () => {
     // ==========================================
     let allLedButtons = [];
 
+    function ensureDragSelectBox() {
+        if (DragSelect.boxEl) return;
+        const container = document.querySelector('.led-grid-container');
+        if (!container) return;
+
+        const box = document.createElement('div');
+        box.className = 'drag-select-box';
+        container.appendChild(box);
+
+        DragSelect.boxEl = box;
+        DragSelect.containerEl = container;
+    }
+
+    function updateSelectionByRect(rect) {
+        const nextSelection = DragSelect.additive ? new Set(DragSelect.originSelection) : new Set();
+        let lastHit = null;
+
+        allLedButtons.forEach(btn => {
+            const btnRect = btn.getBoundingClientRect();
+            const intersects =
+                rect.left <= btnRect.right &&
+                rect.right >= btnRect.left &&
+                rect.top <= btnRect.bottom &&
+                rect.bottom >= btnRect.top;
+
+            if (intersects) {
+                const id = parseInt(btn.dataset.ledId);
+                nextSelection.add(id);
+                lastHit = id;
+            }
+        });
+
+        DragSelect.lastHitLedIndex = lastHit;
+        State.selectedLedIndices = nextSelection;
+        updateLedAppearances();
+        updateBatchIndicator();
+    }
+
+    function onGridPointerDown(e) {
+        if (e.button !== 0) return;
+        if (Simulator.isActive) return;
+
+        const grid = DragSelect.gridEl || document.getElementById('led-grid');
+        if (!grid || !grid.contains(e.target)) return;
+
+        ensureDragSelectBox();
+
+        DragSelect.active = true;
+        DragSelect.hasMoved = false;
+        DragSelect.startX = e.clientX;
+        DragSelect.startY = e.clientY;
+        DragSelect.additive = e.ctrlKey || e.metaKey;
+        DragSelect.originSelection = new Set(State.selectedLedIndices);
+        DragSelect.lastHitLedIndex = null;
+        DragSelect.gridEl = grid;
+
+        if (DragSelect.boxEl) {
+            DragSelect.boxEl.style.display = 'none';
+        }
+    }
+
+    function onGridPointerMove(e) {
+        if (!DragSelect.active || !DragSelect.containerEl) return;
+
+        const dx = e.clientX - DragSelect.startX;
+        const dy = e.clientY - DragSelect.startY;
+        if (!DragSelect.hasMoved && Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
+
+        DragSelect.hasMoved = true;
+        DragSelect.gridEl?.setPointerCapture?.(e.pointerId);
+
+        const minX = Math.min(DragSelect.startX, e.clientX);
+        const minY = Math.min(DragSelect.startY, e.clientY);
+        const maxX = Math.max(DragSelect.startX, e.clientX);
+        const maxY = Math.max(DragSelect.startY, e.clientY);
+
+        const containerRect = DragSelect.containerEl.getBoundingClientRect();
+        if (DragSelect.boxEl) {
+            DragSelect.boxEl.style.left = `${minX - containerRect.left}px`;
+            DragSelect.boxEl.style.top = `${minY - containerRect.top}px`;
+            DragSelect.boxEl.style.width = `${maxX - minX}px`;
+            DragSelect.boxEl.style.height = `${maxY - minY}px`;
+            DragSelect.boxEl.style.display = 'block';
+        }
+
+        e.preventDefault();
+        updateSelectionByRect({
+            left: minX,
+            right: maxX,
+            top: minY,
+            bottom: maxY,
+        });
+    }
+
+    function onGridPointerUp(e) {
+        if (!DragSelect.active) return;
+
+        DragSelect.active = false;
+
+        if (DragSelect.boxEl) {
+            DragSelect.boxEl.style.display = 'none';
+        }
+
+        if (DragSelect.hasMoved) {
+            DragSelect.gridEl?.releasePointerCapture?.(e.pointerId);
+        }
+
+        if (DragSelect.hasMoved) {
+            DragSelect.ignoreClick = true;
+            setTimeout(() => {
+                DragSelect.ignoreClick = false;
+            }, 0);
+
+            if (State.selectedLedIndices.size > 0) {
+                if (
+                    State.currentlyViewedLedIndex === null ||
+                    !State.selectedLedIndices.has(State.currentlyViewedLedIndex)
+                ) {
+                    const fallback = DragSelect.lastHitLedIndex ?? [...State.selectedLedIndices][0];
+                    State.currentlyViewedLedIndex = fallback;
+                }
+                State.lastClickedLedIndex = State.currentlyViewedLedIndex;
+                State.currentblockIndex = 0;
+            } else {
+                State.currentlyViewedLedIndex = null;
+            }
+
+            updateLedAppearances();
+            updateblockSelector();
+            updateBatchIndicator();
+            renderTimeline();
+        }
+    }
+
     function initLedGrid() {
         const grid = document.getElementById('led-grid');
         if (!grid) return;
@@ -506,9 +654,16 @@ document.addEventListener('DOMContentLoaded', () => {
             grid.appendChild(btn);
             allLedButtons.push(btn);
         }
+
+        ensureDragSelectBox();
+        DragSelect.gridEl = grid;
+        grid.addEventListener('pointerdown', onGridPointerDown);
+        grid.addEventListener('pointermove', onGridPointerMove);
+        window.addEventListener('pointerup', onGridPointerUp);
     }
 
     function handleLedClick(ledIndex, event) {
+        if (DragSelect.ignoreClick) return;
         const isCtrl = event.ctrlKey || event.metaKey;
         const isShift = event.shiftKey;
 

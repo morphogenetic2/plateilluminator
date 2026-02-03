@@ -127,6 +127,7 @@ body {
     align-items: center;
     justify-content: center;
     padding: 0.5rem 0;
+    position: relative;
 }
 
 .led-grid {
@@ -136,6 +137,18 @@ body {
     gap: 10px;
     justify-content: center;
     align-items: center;
+    user-select: none;
+    touch-action: none;
+}
+
+.drag-select-box {
+    position: absolute;
+    border: 1px dashed var(--primary);
+    background: rgba(99, 102, 241, 0.15);
+    border-radius: var(--radius-sm);
+    pointer-events: none;
+    z-index: 5;
+    display: none;
 }
 
 .led-btn {
