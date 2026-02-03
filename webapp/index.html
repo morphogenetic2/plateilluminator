@@ -28,6 +28,12 @@
                 <i class="fas fa-lightbulb"></i>
                 LED Configurator
             </div>
+            <div class="header-actions">
+                <button id="undo-btn" class="icon-btn" title="Undo (Ctrl+Z)"
+                    style="font-size: 1rem; background: var(--bg-input); padding: 8px; border-radius: 8px;">
+                    <i class="fas fa-undo"></i> Undo
+                </button>
+            </div>
         </header>
 
         <div class="main-grid">
@@ -36,6 +42,11 @@
                 <div class="panel-title">
                     <span>Selection</span>
                     <i class="fas fa-th"></i>
+                </div>
+                <!-- Batch Edit Warning Banner -->
+                <div id="batch-banner" class="batch-banner" style="display: none;">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <span>Batch: <strong id="batch-count">0</strong></span>
                 </div>
 
                 <div class="led-grid-container">
@@ -52,7 +63,8 @@
             </aside>
 
             <!-- Right Panel: Editor -->
-            <main class="panel editor-container">
+            <main class="panel editor-container" style="position: relative;">
+
                 <!-- Column 1: Step Editor -->
                 <div class="editor-column">
                     <div class="panel-title">
@@ -122,9 +134,16 @@
                         </div>
                     </div>
 
-                    <div style="margin-top: auto;">
-                        <button class="btn-primary" id="add-step-btn" style="width: 100%;">
+                    <div style="margin-top: auto; display: flex; gap: 8px;">
+                        <button class="btn-primary" id="add-step-btn" style="flex: 1;">
                             <i class="fas fa-plus-circle"></i> Add Step
+                        </button>
+                        <button class="btn-primary" id="update-step-btn"
+                            style="flex: 1; display: none; background: var(--accent-success);">
+                            <i class="fas fa-save"></i> Update
+                        </button>
+                        <button class="segment-btn" id="cancel-step-btn" style="display: none;">
+                            Cancel
                         </button>
                     </div>
                 </div>
@@ -152,7 +171,9 @@
                     <div class="control-group">
                         <span class="label-text">Repeat</span>
                         <div class="segmented-control" style="flex:1;">
-                            <button class="segment-btn repeat-mode-btn is-selected" data-mode="once"
+                            <button class="segment-btn repeat-mode-btn" data-mode="continuous"
+                                style="flex:1; justify-content: center;">Cont.</button>
+                            <button class="segment-btn repeat-mode-btn" data-mode="once"
                                 style="flex:1; justify-content: center;">Once</button>
                             <button class="segment-btn repeat-mode-btn" data-mode="count"
                                 style="flex:1; justify-content: center;">Count</button>
@@ -191,33 +212,57 @@
         <!-- Footer / IO -->
         <div class="panel io-bar">
             <div class="io-controls">
-                <button class="segment-btn" id="load-btn">
-                    <i class="fas fa-folder-open"></i> Load
-                </button>
-                <button class="btn-primary" id="export-btn">
-                    <i class="fas fa-download"></i> Export Program
-                </button>
-                <input type="file" id="file-input" accept=".json" style="display: none;">
-            </div>
+                <div class="io-controls">
 
-            <div class="duration-display">
-                <label>TOTAL DURATION</label>
-                <div style="display: flex; align-items: center; gap: 4px;">
-                    <input type="number" id="run-time-hours" class="compact-input" value="0" min="0"
-                        style="width: 50px;">
-                    <span class="input-suffix">h</span>
-                    <input type="number" id="run-time-minutes" class="compact-input" value="0" min="0" max="59"
-                        style="width: 50px;">
-                    <span class="input-suffix">m</span>
-                    <input type="number" id="run-time-seconds" class="compact-input" value="0" min="0" max="59"
-                        style="width: 50px;">
-                    <span class="input-suffix">s</span>
+                    <!-- Playback Cluster -->
+                    <div class="playback-cluster">
+                        <button id="sim-stop-btn" class="control-btn small" title="Stop/Reset">
+                            <i class="fas fa-stop"></i>
+                        </button>
+                        <button id="sim-play-btn" class="control-btn primary" title="Play/Pause">
+                            <i class="fas fa-play"></i>
+                        </button>
+
+                        <div class="sim-time-display" id="sim-time-display">00:00:00.000</div>
+
+                        <div class="segmented-control">
+                            <button class="segment-btn sim-speed-btn is-selected" data-speed="1">1x</button>
+                            <button class="segment-btn sim-speed-btn" data-speed="5">5x</button>
+                            <button class="segment-btn sim-speed-btn" data-speed="10">10x</button>
+                        </div>
+                    </div>
+
+                    <div style="width: 1px; background: var(--border-subtle); height: 24px; margin: 0 8px;"></div>
+
+                    <button class="segment-btn" id="load-btn">
+                        <i class="fas fa-folder-open"></i> Load
+                    </button>
+                    <button class="btn-primary" id="export-btn" style="padding: 0.6rem 1rem; font-size: 0.85rem;">
+                        <i class="fas fa-download"></i> Export
+                    </button>
+                    <input type="file" id="file-input" accept=".json" style="display: none;">
+                </div>
+
+                <div class="duration-display">
+                    <label>TOTAL DURATION</label>
+                    <div style="display: flex; align-items: center; gap: 4px;">
+                        <input type="number" id="run-time-hours" class="compact-input" value="0" min="0"
+                            style="width: 50px;">
+                        <span class="input-suffix">h</span>
+                        <input type="number" id="run-time-minutes" class="compact-input" value="0" min="0" max="59"
+                            style="width: 50px;">
+                        <span class="input-suffix">m</span>
+                        <input type="number" id="run-time-seconds" class="compact-input" value="0" min="0" max="59"
+                            style="width: 50px;">
+                        <span class="input-suffix">s</span>
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
 
-    <script src="script.js"></script>
+
+
+        <script src="script.js"></script>
 </body>
 
 </html>

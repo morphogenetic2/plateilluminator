@@ -225,6 +225,39 @@ body {
     gap: 2rem;
 }
 
+.batch-banner {
+    background: rgba(245, 158, 11, 0.15);
+    border: 1px solid var(--accent-warning);
+    color: var(--accent-warning);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    animation: fadeIn 0.3s ease;
+
+    /* Absolute positioning to prevent layout shift */
+    position: absolute;
+    top: 1.5rem;
+    right: 3.5rem;
+    /* Left of the top-right icon */
+    margin: 0;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
 .editor-column {
     display: flex;
     flex-direction: column;
@@ -469,6 +502,22 @@ input.compact-input {
     user-select: none;
 }
 
+.delete-block-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 0.8rem;
+    padding: 0 4px;
+    opacity: 0.6;
+    transition: color 0.2s, opacity 0.2s;
+}
+
+.delete-block-btn:hover {
+    color: var(--accent-danger);
+    opacity: 1;
+}
+
 .step-pill.type-on {
     background: rgba(245, 158, 11, 0.2);
     color: #fbbf24;
@@ -506,6 +555,26 @@ input.compact-input {
     opacity: 1;
 }
 
+.step-pill.editing {
+    box-shadow: 0 0 0 2px var(--text-main), 0 0 10px var(--primary-glow);
+    animation: pulse-edit 1.5s infinite;
+    z-index: 10;
+}
+
+@keyframes pulse-edit {
+    0% {
+        box-shadow: 0 0 0 2px var(--text-main);
+    }
+
+    50% {
+        box-shadow: 0 0 0 2px var(--text-main), 0 0 12px var(--primary);
+    }
+
+    100% {
+        box-shadow: 0 0 0 2px var(--text-main);
+    }
+}
+
 /* Io Bar */
 .io-bar {
     display: flex;
@@ -531,7 +600,114 @@ input.compact-input {
     /* Ensure it takes needed width */
 }
 
+
 .duration-display label {
     font-size: 0.8rem;
     color: var(--text-muted);
+}
+
+/* ========================================= */
+/* SIMULATOR MODAL */
+/* ========================================= */
+/* Playback Cluster */
+.playback-cluster {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--bg-input);
+    padding: 0.5rem;
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-subtle);
+}
+
+.sim-time-display {
+    font-family: 'Courier New', monospace;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-main);
+    background: var(--bg-panel);
+    padding: 0.4rem 0.8rem;
+    border-radius: var(--radius-sm);
+    min-width: 130px;
+    text-align: center;
+    border: 1px solid var(--border-subtle);
+}
+
+.control-btn {
+    width: 42px;
+    /* Fixed width */
+    height: 42px;
+    /* Fixed height */
+    border-radius: 50%;
+    border: 1px solid var(--border-subtle);
+    background: var(--bg-input);
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    flex-shrink: 0;
+    /* Prevent shrinking */
+}
+
+.control-btn:hover {
+    background: var(--bg-panel);
+    color: var(--text-main);
+    transform: scale(1.05);
+}
+
+#sim-play-btn {
+    background: var(--accent-success);
+    color: white;
+    border: none;
+    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+#sim-play-btn:hover {
+    box-shadow: 0 6px 16px rgba(16, 185, 129, 0.5);
+    transform: scale(1.1);
+}
+
+#sim-stop-btn {
+    background: rgba(239, 68, 68, 0.1);
+    color: var(--accent-danger);
+    border-color: var(--accent-danger);
+}
+
+#sim-stop-btn:hover {
+    background: var(--accent-danger);
+    color: white;
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+.control-btn.small {
+    width: 42px;
+    /* Match Play button size */
+    height: 42px;
+    font-size: 1rem;
+}
+
+/* Simulation Active State */
+.simulating .led-btn {
+    transition: background-color 0s, box-shadow 0s;
+    /* Instant updates for sim */
+}
+
+/* Dynamic Intensity Styling Base */
+.led-btn::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 20%;
+    height: 20%;
+    background: white;
+    border-radius: 50%;
+    opacity: 0;
+    filter: blur(4px);
+    transition: opacity 0.05s;
+    pointer-events: none;
 }

@@ -9,7 +9,47 @@ document.addEventListener('DOMContentLoaded', () => {
         currentlyViewedLedIndex: null,
         currentblockIndex: 0,
         currentStepType: 'ON',
+        editingStepIndex: null,
+        history: [], // Stack of programData strings
+        lastClickedLedIndex: null, // For Shift+click range selection
     };
+
+    function pushHistory() {
+        if (State.history.length > 50) State.history.shift(); // Limit size
+        State.history.push(JSON.stringify(State.programData));
+        document.getElementById('undo-btn').disabled = false;
+        document.getElementById('undo-btn').style.opacity = 1;
+    }
+
+    function undo() {
+        if (State.history.length === 0) return;
+        const prev = State.history.pop();
+        if (State.history.length === 0) {
+            document.getElementById('undo-btn').disabled = true;
+            document.getElementById('undo-btn').style.opacity = 0.5;
+        }
+
+        try {
+            State.programData = JSON.parse(prev);
+            // Refresh UI
+            renderTimeline();
+            updateAllLedProgramIndicators();
+            updateBlockSelector();
+            if (State.editingStepIndex !== null) cancelStepEdit();
+        } catch (e) { console.error('Undo failed', e); }
+    }
+
+    function updateBatchIndicator() {
+        const banner = document.getElementById('batch-banner');
+        const countSpan = document.getElementById('batch-count');
+
+        if (State.selectedLedIndices.size > 1) {
+            banner.style.display = 'flex';
+            countSpan.textContent = State.selectedLedIndices.size;
+        } else {
+            banner.style.display = 'none';
+        }
+    }
 
     function initState() {
         for (let i = 0; i < NUM_LEDS; i++) {
@@ -18,7 +58,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     id: 'block0',
                     steps: [],
                     repeat_duration_minutes: null,
-                    repeat_count: null
+                    repeat_count: null,
+                    repeat_continuous: true
                 }]
             };
         }
@@ -28,6 +69,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // TIMELINE (Horizontal Pills)
     // ==========================================
     let timelineSortableInstance = null;
+    let blockSortableInstance = null;
 
     function renderTimeline() {
         const timeline = document.getElementById('timeline-display');
@@ -63,6 +105,10 @@ document.addEventListener('DOMContentLoaded', () => {
             timelineSortableInstance.destroy();
             timelineSortableInstance = null;
         }
+        if (blockSortableInstance) {
+            blockSortableInstance.destroy();
+            blockSortableInstance = null;
+        }
 
         // Check state
         if (State.currentlyViewedLedIndex === null) {
@@ -89,9 +135,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const blockLabel = document.createElement('div');
             blockLabel.className = 'block-label';
             let repeatInfo = '';
-            if (block.repeat_count) repeatInfo = ` • ${block.repeat_count}x`;
+            if (block.repeat_continuous) repeatInfo = ' • ∞';
+            else if (block.repeat_count) repeatInfo = ` • ${block.repeat_count}x`;
             else if (block.repeat_duration_minutes) repeatInfo = ` • ${block.repeat_duration_minutes}min`;
-            blockLabel.textContent = `${block.id || `block ${blockIdx + 1}`}${repeatInfo}`;
+            blockLabel.innerHTML = `
+                <span>${block.id || `block ${blockIdx + 1}`}${repeatInfo}</span>
+                <button class="delete-block-btn" data-block-index="${blockIdx}" title="Remove Block">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
             blockGroup.appendChild(blockLabel);
 
             const stepsContainer = document.createElement('div');
@@ -117,11 +169,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     else if (step.type === 'RAMP') details = `${step.duration_ms}ms: ${step.int0}→${step.int1}`;
                     else if (step.type === 'SINE') details = `${step.duration_ms}ms: ${step.freq}Hz`;
 
+                    if (State.editingStepIndex === stepIdx && State.currentblockIndex === blockIdx) {
+                        pill.classList.add('editing');
+                    }
+
                     pill.innerHTML = `
                         <span>${step.type}</span>
                         <span style="opacity:0.7; font-size:0.65rem;">${details}</span>
                         <button class="delete-step" data-block-index="${blockIdx}" data-step-index="${stepIdx}" title="Remove"><i class="fas fa-times"></i></button>
                     `;
+
+                    pill.addEventListener('click', (e) => {
+                        if (!e.target.classList.contains('delete-step') && !e.target.closest('.delete-step')) {
+                            loadStepForEditing(stepIdx);
+                            e.stopPropagation();
+                        }
+                    });
+
                     stepsContainer.appendChild(pill);
                 });
             }
@@ -143,11 +207,24 @@ document.addEventListener('DOMContentLoaded', () => {
         timeline.querySelectorAll('.delete-step').forEach(btn => {
             btn.addEventListener('click', (e) => {
                 e.stopPropagation();
+
+                pushHistory(); // Undo point before delete
+
                 const blockIdx = parseInt(btn.dataset.blockIndex);
                 const stepIdx = parseInt(btn.dataset.stepIndex);
                 blocks[blockIdx].steps.splice(stepIdx, 1);
                 renderTimeline();
                 updateAllLedProgramIndicators();
+            });
+        });
+
+        // Delete Block Handlers
+        timeline.querySelectorAll('.delete-block-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const blockIdx = parseInt(btn.dataset.blockIndex);
+                // Call global wrapper or method? removeBlock is defined in outer scope.
+                removeblock(blockIdx);
             });
         });
 
@@ -159,8 +236,56 @@ document.addEventListener('DOMContentLoaded', () => {
                 filter: '.delete-step',
                 onEnd: (evt) => {
                     if (evt.oldIndex === evt.newIndex) return;
+                    pushHistory();
                     const [moved] = blocks[State.currentblockIndex].steps.splice(evt.oldIndex, 1);
                     blocks[State.currentblockIndex].steps.splice(evt.newIndex, 0, moved);
+                }
+            });
+        }
+
+        // Sortable for BLOCKS (NEW)
+        if (blocks.length > 1) {
+            blockSortableInstance = Sortable.create(timeline, {
+                animation: 150,
+                handle: '.block-label', // Drag by header only
+                filter: '.delete-block-btn',
+                onEnd: (evt) => {
+                    if (evt.oldIndex === evt.newIndex) return;
+
+                    pushHistory();
+
+                    // Apply reorder to ALL selected LEDs
+                    State.selectedLedIndices.forEach(ledIdx => {
+                        const targetLedData = State.programData[`LED${ledIdx}`];
+                        if (targetLedData?.blocks && targetLedData.blocks.length > evt.oldIndex) {
+                            // Ensure enough blocks exist to swap (basic safety)
+                            const [movedBlock] = targetLedData.blocks.splice(evt.oldIndex, 1);
+                            // Careful with index bounds if arrays differ, but assuming batch symmetry:
+                            targetLedData.blocks.splice(evt.newIndex, 0, movedBlock);
+                        }
+                    });
+
+                    // Update State.currentblockIndex if we moved the active block check
+                    // If active block was at oldIndex, it's now at newIndex.
+                    // If active was between old and new, it shifted.
+                    // Simplest approach: Map the index. 
+                    if (State.currentblockIndex === evt.oldIndex) {
+                        State.currentblockIndex = evt.newIndex;
+                    } else if (State.currentblockIndex > evt.oldIndex && State.currentblockIndex <= evt.newIndex) {
+                        // Block moved from left to right, passing current. Current shifts left (-1).
+                        State.currentblockIndex--;
+                    } else if (State.currentblockIndex < evt.oldIndex && State.currentblockIndex >= evt.newIndex) {
+                        // Block moved from right to left, passing current. Current shifts right (+1).
+                        State.currentblockIndex++;
+                    }
+
+                    // Re-render to ensure DOM indices match data
+                    updateblockSelector();
+                    // renderTimeline(); // Sortable moved DOM, but we want full refresh to be clean
+                    // Actually, if we don't re-render, the data-index attributes on other blocks are WRONG.
+                    // So we MUST re-render.
+                    renderTimeline();
+                    updateAllLedProgramIndicators();
                 }
             });
         }
@@ -222,7 +347,8 @@ document.addEventListener('DOMContentLoaded', () => {
         blocks.forEach((block, i) => {
             const opt = document.createElement('option');
             let repeatInfo = '';
-            if (block.repeat_count) repeatInfo = ` (${block.repeat_count}x)`;
+            if (block.repeat_continuous) repeatInfo = ' (∞)';
+            else if (block.repeat_count) repeatInfo = ` (${block.repeat_count}x)`;
             else if (block.repeat_duration_minutes) repeatInfo = ` (${block.repeat_duration_minutes}min)`;
             opt.value = i;
             opt.textContent = `${block.id || `block ${i + 1}`}${repeatInfo}`;
@@ -249,7 +375,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         let mode = 'once';
-        if (block.repeat_count) mode = 'count';
+        if (block.repeat_continuous) mode = 'continuous';
+        else if (block.repeat_count) mode = 'count';
         else if (block.repeat_duration_minutes) mode = 'duration';
 
         document.querySelector(`.repeat-mode-btn[data-mode="${mode}"]`)?.classList.add('is-selected');
@@ -276,12 +403,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let repeat_count = null;
         let repeat_duration_minutes = null;
+        let repeat_continuous = false;
 
         if (selectedMode === 'count') {
             repeat_count = Math.max(1, parseInt(document.getElementById('repeat-count-input').value) || 1);
         } else if (selectedMode === 'duration') {
             repeat_duration_minutes = Math.max(0, parseFloat(document.getElementById('repeat-duration-input').value) || 1);
+        } else if (selectedMode === 'continuous') {
+            repeat_continuous = true;
         }
+
+        pushHistory();
 
         // Apply to ALL selected LEDs
         State.selectedLedIndices.forEach(ledIdx => {
@@ -292,9 +424,11 @@ document.addEventListener('DOMContentLoaded', () => {
             targetblock.id = blockName || `block${State.currentblockIndex}`;
             targetblock.repeat_count = repeat_count;
             targetblock.repeat_duration_minutes = repeat_duration_minutes;
+            targetblock.repeat_continuous = repeat_continuous;
         });
 
         updateblockSelector();
+        renderTimeline();
     }
 
     function addblock() {
@@ -303,13 +437,16 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        pushHistory();
+
         State.selectedLedIndices.forEach(idx => {
             const ledData = State.programData[`LED${idx}`];
             const newblock = {
                 id: `block${ledData.blocks.length}`,
                 steps: [],
                 repeat_duration_minutes: null,
-                repeat_count: null
+                repeat_count: null,
+                repeat_continuous: true
             };
             ledData.blocks.push(newblock);
         });
@@ -324,17 +461,27 @@ document.addEventListener('DOMContentLoaded', () => {
         updateAllLedProgramIndicators();
     }
 
-    function removeblock() {
+    function removeblock(targetBlockIdx = null) {
         if (State.currentlyViewedLedIndex === null) return;
 
         const ledData = State.programData[`LED${State.currentlyViewedLedIndex}`];
         if (!ledData.blocks || ledData.blocks.length === 0) return;
 
-        if (!confirm(`Remove block ${State.currentblockIndex + 1}?`)) return;
+        // If no index provided, use current (from button)
+        const idxToRemove = targetBlockIdx !== null ? targetBlockIdx : State.currentblockIndex;
 
-        ledData.blocks.splice(State.currentblockIndex, 1);
+        if (!confirm(`Remove block ${idxToRemove + 1}?`)) return;
+
+        pushHistory();
+
+        ledData.blocks.splice(idxToRemove, 1);
+
+        // Adjust current selection if needed
         if (State.currentblockIndex >= ledData.blocks.length) {
             State.currentblockIndex = Math.max(0, ledData.blocks.length - 1);
+        } else if (idxToRemove < State.currentblockIndex) {
+            // If we removed a block *before* the current one, decrement index
+            State.currentblockIndex--;
         }
 
         updateblockSelector();
@@ -368,14 +515,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function handleLedClick(ledIndex, event) {
         const isCtrl = event.ctrlKey || event.metaKey;
+        const isShift = event.shiftKey;
 
-        if (isCtrl) {
+        if (isShift && State.lastClickedLedIndex !== null) {
+            // Shift+click: Select range
+            const start = Math.min(State.lastClickedLedIndex, ledIndex);
+            const end = Math.max(State.lastClickedLedIndex, ledIndex);
+
+            // Add all LEDs in range to selection
+            for (let i = start; i <= end; i++) {
+                State.selectedLedIndices.add(i);
+            }
+        } else if (isCtrl) {
+            // Ctrl+click: Toggle individual LED
             if (State.selectedLedIndices.has(ledIndex)) {
                 State.selectedLedIndices.delete(ledIndex);
             } else {
                 State.selectedLedIndices.add(ledIndex);
             }
         } else {
+            // Regular click: Select only this LED
             if (State.selectedLedIndices.has(ledIndex) && State.selectedLedIndices.size === 1) {
                 State.selectedLedIndices.clear();
             } else {
@@ -384,11 +543,15 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
+        // Update last clicked for Shift+click functionality
+        State.lastClickedLedIndex = ledIndex;
+
         State.currentlyViewedLedIndex = ledIndex;
         State.currentblockIndex = 0;
 
         updateLedAppearances();
         updateblockSelector();
+        updateBatchIndicator();
         renderTimeline();
     }
 
@@ -442,18 +605,106 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Check all selected LEDs have blocks
+        if (!validateSelection()) return;
+
+        const step = buildStepObject();
+        if (!step) return;
+
+        pushHistory();
+
+        State.selectedLedIndices.forEach(idx => {
+            const ledData = State.programData[`LED${idx}`];
+            const block = ledData.blocks[State.currentblockIndex];
+            if (block) {
+                block.steps.push({ ...step });
+            }
+        });
+
+        renderTimeline();
+        updateAllLedProgramIndicators();
+    }
+
+    function validateSelection() {
         for (const idx of State.selectedLedIndices) {
             const ledData = State.programData[`LED${idx}`];
             if (!ledData.blocks || ledData.blocks.length === 0) {
                 alert(`LED ${idx + 1} has no blocks. Add a block first.`);
-                return;
+                return false;
             }
         }
+        return true;
+    }
 
+    function loadStepForEditing(stepIdx) {
+        if (State.currentlyViewedLedIndex === null) return;
+
+        const ledData = State.programData[`LED${State.currentlyViewedLedIndex}`];
+        const block = ledData?.blocks[State.currentblockIndex];
+        if (!block || !block.steps[stepIdx]) return;
+
+        const step = block.steps[stepIdx];
+        State.editingStepIndex = stepIdx;
+        State.currentStepType = step.type;
+
+        // Select Type Button
+        document.querySelectorAll('.step-type-btn').forEach(b => {
+            b.classList.remove('is-selected');
+            if (b.dataset.value === step.type) b.classList.add('is-selected');
+        });
+
+        // Populate Common
+        document.getElementById('step-duration').value = step.duration_ms;
+
+        // Populate Specifics
+        if (step.type === 'ON') {
+            document.getElementById('on-int').value = step.int;
+        } else if (step.type === 'RAMP') {
+            document.getElementById('ramp-int0').value = step.int0;
+            document.getElementById('ramp-int1').value = step.int1;
+        } else if (step.type === 'SINE') {
+            document.getElementById('sine-int0').value = step.int0;
+            document.getElementById('sine-int1').value = step.int1;
+            document.getElementById('sine-freq').value = step.freq;
+        }
+
+        updateStepParams();
+        updateEditButtonsUI();
+        renderTimeline(); // to show highlight
+    }
+
+    function cancelStepEdit() {
+        State.editingStepIndex = null;
+        updateEditButtonsUI();
+        renderTimeline();
+    }
+
+    function updateStep() {
+        if (State.editingStepIndex === null) return;
+
+        const step = buildStepObject();
+        if (!step) return;
+
+        pushHistory();
+
+        State.selectedLedIndices.forEach(idx => {
+            const ledData = State.programData[`LED${idx}`];
+            const block = ledData.blocks[State.currentblockIndex];
+            if (block && block.steps[State.editingStepIndex]) {
+                // Preserve original type if we want? No, overwrite completely.
+                block.steps[State.editingStepIndex] = step;
+            }
+        });
+
+        cancelStepEdit(); // Clear mode
+        renderTimeline();
+        updateAllLedProgramIndicators();
+    }
+
+    function buildStepObject() {
         const duration = parseInt(document.getElementById('step-duration').value) || 1000;
         if (duration < 50) {
             alert('Duration must be >= 50ms');
-            return;
+            return null;
         }
 
         const step = { type: State.currentStepType, duration_ms: duration };
@@ -468,17 +719,14 @@ document.addEventListener('DOMContentLoaded', () => {
             step.int1 = Math.min(1400, Math.max(0, parseInt(document.getElementById('sine-int1').value) || 0));
             step.freq = Math.min(20, Math.max(0, parseFloat(document.getElementById('sine-freq').value) || 1));
         }
+        return step;
+    }
 
-        State.selectedLedIndices.forEach(idx => {
-            const ledData = State.programData[`LED${idx}`];
-            const block = ledData.blocks[State.currentblockIndex];
-            if (block) {
-                block.steps.push({ ...step });
-            }
-        });
-
-        renderTimeline();
-        updateAllLedProgramIndicators();
+    function updateEditButtonsUI() {
+        const isEditing = State.editingStepIndex !== null;
+        document.getElementById('add-step-btn').style.display = isEditing ? 'none' : 'inline-flex';
+        document.getElementById('update-step-btn').style.display = isEditing ? 'inline-flex' : 'none';
+        document.getElementById('cancel-step-btn').style.display = isEditing ? 'inline-flex' : 'none';
     }
 
     // ==========================================
@@ -495,7 +743,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const steps = block.steps || [];
             const blockDurationMs = steps.reduce((sum, step) => sum + (step.duration_ms || 0), 0);
 
-            if (block.repeat_count) {
+            if (block.repeat_continuous) {
+                // For continuous blocks, we can't really calculate a total duration
+                // We'll just count one loop for export calculation purposes, 
+                // or maybe warn the user? For this purpose let's count 1 loop.
+                totalMs += blockDurationMs;
+            } else if (block.repeat_count) {
                 totalMs += blockDurationMs * block.repeat_count;
             } else if (block.repeat_duration_minutes) {
                 totalMs += block.repeat_duration_minutes * 60 * 1000;
@@ -660,12 +913,14 @@ document.addEventListener('DOMContentLoaded', () => {
             State.currentlyViewedLedIndex = 0;
             updateLedAppearances();
             updateblockSelector();
+            updateBatchIndicator();
             renderTimeline();
         });
 
         document.getElementById('select-none-btn')?.addEventListener('click', () => {
             State.selectedLedIndices.clear();
             updateLedAppearances();
+            updateBatchIndicator();
         });
 
         document.getElementById('clear-selected-btn')?.addEventListener('click', () => {
@@ -699,6 +954,16 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('repeat-count-input')?.addEventListener('blur', saveblockConfig);
         document.getElementById('repeat-duration-input')?.addEventListener('blur', saveblockConfig);
 
+        // Intensity Clamping
+        ['on-int', 'ramp-int0', 'ramp-int1', 'sine-int0', 'sine-int1'].forEach(id => {
+            document.getElementById(id)?.addEventListener('blur', (e) => {
+                let val = parseInt(e.target.value);
+                if (val > 1400) {
+                    e.target.value = 1400;
+                }
+            });
+        });
+
         document.querySelectorAll('.repeat-mode-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 document.querySelectorAll('.repeat-mode-btn').forEach(b => b.classList.remove('is-selected'));
@@ -714,14 +979,321 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Add step
         document.getElementById('add-step-btn')?.addEventListener('click', addStep);
+        document.getElementById('update-step-btn')?.addEventListener('click', updateStep);
+        document.getElementById('cancel-step-btn')?.addEventListener('click', cancelStepEdit);
 
         // File I/O
         document.getElementById('load-btn')?.addEventListener('click', () => {
             document.getElementById('file-input').click();
         });
-        document.getElementById('file-input')?.addEventListener('change', loadProgram);
+        document.getElementById('file-input')?.addEventListener('change', (e) => {
+            pushHistory(); // Save before load
+            loadProgram(e);
+        });
         document.getElementById('export-btn')?.addEventListener('click', exportProgram);
+
+        // Undo
+        document.getElementById('undo-btn')?.addEventListener('click', undo);
+        document.addEventListener('keydown', (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+                e.preventDefault();
+                undo();
+            }
+        });
     }
+
+
+    // ==========================================
+    // SIMULATOR
+    // ==========================================
+    class LedRuntime {
+        constructor(ledId, blocks) {
+            this.ledId = ledId;
+            this.blocks = blocks;
+            this.reset();
+        }
+
+        reset() {
+            this.blockIdx = 0;
+            this.stepIdx = 0;
+            this.blockLoopCount = 0;
+            this.blockStartTime = 0;
+            this.stepStartTime = 0;
+            this.isDone = false;
+            this.currentInt = 0;
+            // Handle empty program
+            if (!this.blocks || this.blocks.length === 0) {
+                this.isDone = true;
+            }
+        }
+
+        tick(globalTime) {
+            if (this.isDone) return 0;
+
+            const block = this.blocks[this.blockIdx];
+            if (!block || !block.steps || block.steps.length === 0) {
+                this.advanceBlock(globalTime);
+                return 0; // Skip empty block
+            }
+
+            // Check block duration limit
+            if (block.repeat_duration_minutes) {
+                const blockDurationMs = block.repeat_duration_minutes * 60 * 1000;
+                if (globalTime - this.blockStartTime >= blockDurationMs) {
+                    this.advanceBlock(globalTime);
+                    return this.tick(globalTime);
+                }
+            }
+
+            const step = block.steps[this.stepIdx];
+            const timeInStep = globalTime - this.stepStartTime;
+
+            // Calculate Intensity
+            let val = 0;
+            if (step.type === 'ON') val = step.int;
+            else if (step.type === 'OFF') val = 0;
+            else if (step.type === 'RAMP') {
+                const progress = Math.min(1, timeInStep / step.duration_ms);
+                val = step.int0 + (step.int1 - step.int0) * progress;
+            } else if (step.type === 'SINE') {
+                // SINE: freq in Hz. 2PI * freq * t(s)
+                // Map [-1, 1] to [min, max]
+                const tSec = timeInStep / 1000;
+                const sineVal = Math.sin(2 * Math.PI * step.freq * tSec); // -1 to 1
+                const amp = (step.int1 - step.int0) / 2;
+                const mid = step.int0 + amp;
+                val = mid + (sineVal * amp);
+            }
+
+            this.currentInt = val;
+
+            // Check Step Complete
+            if (timeInStep >= step.duration_ms) {
+                this.advanceStep(globalTime);
+            }
+
+            return Math.max(0, val);
+        }
+
+        advanceStep(globalTime) {
+            this.stepIdx++;
+            const block = this.blocks[this.blockIdx];
+
+            // End of block steps?
+            if (this.stepIdx >= block.steps.length) {
+                // Check block Repetition
+                if (block.repeat_continuous) {
+                    this.stepIdx = 0; // Loop forever
+                } else if (block.repeat_count) {
+                    this.blockLoopCount++;
+                    if (this.blockLoopCount < block.repeat_count) {
+                        this.stepIdx = 0; // Loop block
+                    } else {
+                        this.advanceBlock(globalTime); // Done with this block
+                    }
+                } else if (!block.repeat_duration_minutes) {
+                    // Mode Once
+                    this.advanceBlock(globalTime);
+                } else {
+                    // Mode Duration - just loop steps until duration cuts it off
+                    this.stepIdx = 0;
+                }
+            }
+            this.stepStartTime = globalTime;
+        }
+
+        advanceBlock(globalTime) {
+            this.blockIdx++;
+            this.stepIdx = 0;
+            this.blockLoopCount = 0;
+            this.blockStartTime = globalTime;
+            this.stepStartTime = globalTime;
+
+            if (this.blockIdx >= this.blocks.length) {
+                this.isDone = true;
+            }
+        }
+    }
+
+    const Simulator = {
+        isActive: false,
+        isPlaying: false,
+        speed: 1,
+        currentTime: 0,
+        lastFrameTime: 0,
+        runtimes: [], // Array of LedRuntime
+        rafId: null,
+        savedSelection: null,
+        savedViewedLedLink: null,
+
+        init() {
+            // Nothing special to init visual-wise, we use existing #led-grid
+        },
+
+        // "Open" concept is gone. We just Play/Stop.
+
+        togglePlay() {
+            if (this.isPlaying) this.pause();
+            else this.play();
+        },
+
+        play() {
+            if (this.isPlaying) return;
+
+            // If starting from scratch/stopped
+            if (!this.isActive) {
+                this.startSession();
+            }
+
+            this.isPlaying = true;
+            this.lastFrameTime = performance.now();
+            document.getElementById('sim-play-btn').innerHTML = '<i class="fas fa-pause"></i>';
+            document.body.classList.add('simulating');
+            this.loop();
+        },
+
+        startSession() {
+            this.isActive = true;
+            this.currentTime = 0;
+
+            // Backup and Clear Selection
+            this.savedSelection = new Set(State.selectedLedIndices);
+            this.savedViewedLedLink = State.currentlyViewedLedIndex;
+
+            State.selectedLedIndices.clear();
+            State.currentlyViewedLedIndex = null;
+
+            updateLedAppearances();
+            updateblockSelector();
+            updateBatchIndicator();
+            renderTimeline();
+
+            // Re-build runtimes
+            this.runtimes = [];
+            for (let i = 0; i < NUM_LEDS; i++) {
+                const ledData = State.programData[`LED${i}`] || { blocks: [] };
+                this.runtimes.push(new LedRuntime(i, ledData.blocks));
+            }
+        },
+
+        pause() {
+            this.isPlaying = false;
+            cancelAnimationFrame(this.rafId);
+            document.getElementById('sim-play-btn').innerHTML = '<i class="fas fa-play"></i>';
+        },
+
+        stop() {
+            this.pause();
+            this.isActive = false;
+            this.currentTime = 0;
+            this.runtimes.forEach(r => r.reset());
+            this.updateDisplay();
+
+            // Restore Selection and UI
+            if (this.savedSelection) {
+                State.selectedLedIndices = new Set(this.savedSelection);
+                State.currentlyViewedLedIndex = this.savedViewedLedLink;
+                this.savedSelection = null;
+                this.savedViewedLedLink = null;
+            }
+
+            document.body.classList.remove('simulating');
+
+            updateLedAppearances();
+            updateblockSelector();
+            updateBatchIndicator();
+            renderTimeline();
+        },
+
+        setSpeed(val) {
+            this.speed = val;
+            document.querySelectorAll('.sim-speed-btn').forEach(b => {
+                b.classList.toggle('is-selected', parseInt(b.dataset.speed) === val);
+            });
+        },
+
+        loop() {
+            if (!this.isPlaying) return;
+
+            const now = performance.now();
+            const realDelta = now - this.lastFrameTime;
+            this.lastFrameTime = now;
+
+            const simDelta = realDelta * this.speed;
+            this.currentTime += simDelta;
+
+            // Tick runtimes
+            let allDone = true;
+            this.runtimes.forEach((rt, idx) => {
+                const intensity = rt.tick(this.currentTime); // 0-1400
+                if (!rt.isDone) allDone = false;
+
+                // Visual update TARGETING MAIN GRID
+                // We need to find the correct button.
+                // The main grid buttons are .led-btn and have data-led-id
+                const el = allLedButtons[idx];
+                if (el) {
+                    const norm = Math.min(1, intensity / 1400);
+
+                    // Visual calculation
+                    const bgLightness = 10 + (norm * 50); // 10% to 60%
+
+                    el.style.backgroundColor = `hsl(245, 50%, ${bgLightness}%)`;
+                    el.style.boxShadow = `0 0 ${10 + (norm * 20)}px rgba(99, 102, 241, ${0.2 + (norm * 0.8)})`;
+                    el.style.borderColor = `rgba(255,255,255,${0.1 + (norm * 0.9)})`;
+                }
+            });
+
+            // Update Time Display
+            this.updateTimeDisplay();
+
+            if (allDone) {
+                this.pause();
+            } else {
+                this.rafId = requestAnimationFrame(() => this.loop());
+            }
+        },
+
+        updateDisplay() {
+            this.updateTimeDisplay();
+            // Reset LEDs visual
+            // This is handled by stop() calling updateLedAppearances()
+            if (!this.isActive) {
+                allLedButtons.forEach(el => {
+                    el.style.backgroundColor = '';
+                    el.style.boxShadow = '';
+                    el.style.borderColor = '';
+                });
+            }
+        },
+
+        updateTimeDisplay() {
+            const ms = this.currentTime;
+            const h = Math.floor(ms / 3600000);
+            const m = Math.floor((ms % 3600000) / 60000);
+            const s = Math.floor((ms % 60000) / 1000);
+            const sms = Math.floor(ms % 1000);
+
+            const pad = (n, z = 2) => n.toString().padStart(z, '0');
+            document.getElementById('sim-time-display').textContent =
+                `${pad(h)}:${pad(m)}:${pad(s)}.${pad(sms, 3)}`;
+        }
+    };
+
+    function initSimulatorEvents() {
+        Simulator.init();
+
+        document.getElementById('sim-play-btn')?.addEventListener('click', () => Simulator.togglePlay());
+        document.getElementById('sim-stop-btn')?.addEventListener('click', () => Simulator.stop());
+
+        document.querySelectorAll('.sim-speed-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                Simulator.setSpeed(parseInt(btn.dataset.speed));
+            });
+        });
+    }
+
+    initSimulatorEvents();
 
     // ==========================================
     // INIT
