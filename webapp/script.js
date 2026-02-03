@@ -12,6 +12,7 @@ document.addEventListener('DOMContentLoaded', () => {
         editingStepIndex: null,
         history: [], // Stack of programData strings
         lastClickedLedIndex: null, // For Shift+click range selection
+        clipboard: null, // For copy/paste LED programs
     };
 
     function pushHistory() {
@@ -54,13 +55,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function initState() {
         for (let i = 0; i < NUM_LEDS; i++) {
             State.programData[`LED${i}`] = {
-                blocks: [{
-                    id: 'block0',
-                    steps: [],
-                    repeat_duration_minutes: null,
-                    repeat_count: null,
-                    repeat_continuous: true
-                }]
+                blocks: []
             };
         }
     }
@@ -586,6 +581,98 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // ==========================================
+    // VIEW ALL TIMELINES MODAL
+    // ==========================================
+    function renderAllTimelinesModal() {
+        const container = document.getElementById('all-timelines-container');
+        if (!container) return;
+
+        container.innerHTML = '';
+
+        // Iterate through all LEDs
+        for (let i = 0; i < NUM_LEDS; i++) {
+            const ledData = State.programData[`LED${i}`];
+            const blocks = ledData?.blocks || [];
+
+            // Filter: Hide LEDs with no blocks or only empty blocks
+            const hasAnySteps = blocks.some(block => block.steps && block.steps.length > 0);
+            if (!hasAnySteps) continue;
+
+            // Create row
+            const row = document.createElement('div');
+            row.className = 'timeline-row';
+
+            // LED Label
+            const label = document.createElement('div');
+            label.className = 'timeline-row-label';
+            label.textContent = `LED ${i + 1}`;
+            row.appendChild(label);
+
+            // Timeline Content
+            const content = document.createElement('div');
+            content.className = 'timeline-row-content';
+
+            blocks.forEach((block, blockIdx) => {
+                // Skip empty blocks
+                if (!block.steps || block.steps.length === 0) return;
+
+                const blockGroup = document.createElement('div');
+                blockGroup.className = 'block-group';
+                blockGroup.style.cursor = 'default'; // Read-only
+
+                // Block label
+                const blockLabel = document.createElement('div');
+                blockLabel.className = 'block-label';
+                let repeatInfo = '';
+                if (block.repeat_continuous) repeatInfo = ' • ∞';
+                else if (block.repeat_count) repeatInfo = ` • ${block.repeat_count}x`;
+                else if (block.repeat_duration_minutes) repeatInfo = ` • ${block.repeat_duration_minutes}min`;
+                blockLabel.textContent = `${block.id || `Block ${blockIdx + 1}`}${repeatInfo}`;
+                blockGroup.appendChild(blockLabel);
+
+                // Steps
+                const stepsContainer = document.createElement('div');
+                stepsContainer.className = 'block-steps';
+
+                block.steps.forEach((step, stepIdx) => {
+                    const pill = document.createElement('div');
+                    pill.className = `step-pill type-${step.type.toLowerCase()}`;
+                    pill.style.cursor = 'default'; // Read-only
+
+                    let details = '';
+                    if (step.type === 'ON') details = `${step.duration_ms}ms @ ${step.int}`;
+                    else if (step.type === 'OFF') details = `${step.duration_ms}ms`;
+                    else if (step.type === 'RAMP') details = `${step.duration_ms}ms: ${step.int0}→${step.int1}`;
+                    else if (step.type === 'SINE') details = `${step.duration_ms}ms: ${step.freq}Hz`;
+
+                    pill.innerHTML = `
+                        <span>${step.type}</span>
+                        <span style="opacity:0.7; font-size:0.65rem;">${details}</span>
+                    `;
+
+                    stepsContainer.appendChild(pill);
+                });
+
+                blockGroup.appendChild(stepsContainer);
+                content.appendChild(blockGroup);
+            });
+
+            row.appendChild(content);
+            container.appendChild(row);
+        }
+
+        // If no LEDs have programs, show message
+        if (container.children.length === 0) {
+            const emptyMsg = document.createElement('div');
+            emptyMsg.className = 'timeline-empty';
+            emptyMsg.textContent = 'No LED programs to display.';
+            emptyMsg.style.padding = '2rem';
+            emptyMsg.style.textAlign = 'center';
+            container.appendChild(emptyMsg);
+        }
+    }
+
+    // ==========================================
     // STEP EDITOR
     // ==========================================
     function updateStepParams() {
@@ -604,9 +691,6 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Check all selected LEDs have blocks
-        if (!validateSelection()) return;
-
         const step = buildStepObject();
         if (!step) return;
 
@@ -614,6 +698,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
         State.selectedLedIndices.forEach(idx => {
             const ledData = State.programData[`LED${idx}`];
+
+            // Auto-create first block if LED has no blocks
+            if (!ledData.blocks || ledData.blocks.length === 0) {
+                ledData.blocks = [{
+                    id: 'block0',
+                    steps: [],
+                    repeat_duration_minutes: null,
+                    repeat_count: null,
+                    repeat_continuous: true
+                }];
+                // Set current block index to 0 for this new block
+                State.currentblockIndex = 0;
+            }
+
             const block = ledData.blocks[State.currentblockIndex];
             if (block) {
                 block.steps.push({ ...step });
@@ -995,9 +1093,127 @@ document.addEventListener('DOMContentLoaded', () => {
         // Undo
         document.getElementById('undo-btn')?.addEventListener('click', undo);
         document.addEventListener('keydown', (e) => {
+            // Ctrl+Z: Undo
             if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
                 e.preventDefault();
                 undo();
+            }
+
+            // Ctrl+A: Select All LEDs
+            if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+                e.preventDefault();
+                State.selectedLedIndices.clear();
+                for (let i = 0; i < NUM_LEDS; i++) {
+                    State.selectedLedIndices.add(i);
+                }
+                // Keep current viewed LED if set, otherwise view first
+                if (State.currentlyViewedLedIndex === null) {
+                    State.currentlyViewedLedIndex = 0;
+                }
+                updateLedAppearances();
+                updateblockSelector();
+                updateBatchIndicator();
+                renderTimeline();
+            }
+
+            // Ctrl+C: Copy current LED program
+            if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+                e.preventDefault();
+                if (State.currentlyViewedLedIndex !== null) {
+                    const ledKey = `LED${State.currentlyViewedLedIndex}`;
+                    const ledData = State.programData[ledKey];
+
+                    // Deep copy the LED program
+                    State.clipboard = JSON.parse(JSON.stringify(ledData || { blocks: [] }));
+
+                    // Visual feedback
+                    const timelineLabel = document.getElementById('timeline-label');
+                    if (timelineLabel) {
+                        const originalText = timelineLabel.textContent;
+                        timelineLabel.textContent = ' (Copied!)';
+                        timelineLabel.style.color = 'var(--accent-success)';
+                        setTimeout(() => {
+                            timelineLabel.textContent = originalText;
+                            timelineLabel.style.color = 'var(--primary)';
+                        }, 1000);
+                    }
+                }
+            }
+
+            // Ctrl+V: Paste to selected LEDs
+            if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+                e.preventDefault();
+                if (State.clipboard && State.selectedLedIndices.size > 0) {
+                    // Check if clipboard is empty (no blocks or only empty blocks)
+                    const clipboardIsEmpty = !State.clipboard.blocks ||
+                        State.clipboard.blocks.length === 0 ||
+                        !State.clipboard.blocks.some(block => block.steps && block.steps.length > 0);
+
+                    // Check if any target LEDs have programs
+                    let targetsHavePrograms = false;
+                    State.selectedLedIndices.forEach(ledIdx => {
+                        const ledKey = `LED${ledIdx}`;
+                        const ledData = State.programData[ledKey];
+                        if (ledData?.blocks) {
+                            for (const block of ledData.blocks) {
+                                if (block.steps && block.steps.length > 0) {
+                                    targetsHavePrograms = true;
+                                    break;
+                                }
+                            }
+                        }
+                    });
+
+                    // Warn if pasting empty over non-empty
+                    if (clipboardIsEmpty && targetsHavePrograms) {
+                        const confirmed = confirm(
+                            `⚠️ Warning: You are about to paste an empty program.\n\n` +
+                            `This will clear the existing programs on ${State.selectedLedIndices.size} LED${State.selectedLedIndices.size > 1 ? 's' : ''}.\n\n` +
+                            `Do you want to continue?`
+                        );
+                        if (!confirmed) return; // User canceled
+                    }
+
+                    pushHistory(); // Undo point
+
+                    State.selectedLedIndices.forEach(ledIdx => {
+                        const ledKey = `LED${ledIdx}`;
+                        // Deep copy from clipboard
+                        State.programData[ledKey] = JSON.parse(JSON.stringify(State.clipboard));
+                    });
+
+                    // Visual feedback
+                    const timelineLabel = document.getElementById('timeline-label');
+                    if (timelineLabel) {
+                        const originalText = timelineLabel.textContent;
+                        timelineLabel.textContent = ` (Pasted to ${State.selectedLedIndices.size} LED${State.selectedLedIndices.size > 1 ? 's' : ''}!)`;
+                        timelineLabel.style.color = 'var(--accent-success)';
+                        setTimeout(() => {
+                            timelineLabel.textContent = originalText;
+                            timelineLabel.style.color = 'var(--primary)';
+                        }, 1500);
+                    }
+
+                    renderTimeline();
+                    updateAllLedProgramIndicators();
+                }
+            }
+        });
+
+        // View All Modal
+        document.getElementById('view-all-btn')?.addEventListener('click', () => {
+            renderAllTimelinesModal();
+            document.getElementById('view-all-modal').style.display = 'flex';
+        });
+
+        document.getElementById('close-view-all-btn')?.addEventListener('click', () => {
+            document.getElementById('view-all-modal').style.display = 'none';
+        });
+
+        // Close modal on background click
+        document.getElementById('view-all-modal')?.addEventListener('click', (e) => {
+            if (e.target.id === 'view-all-modal') {
+                document.getElementById('view-all-modal').style.display = 'none';
             }
         });
     }
