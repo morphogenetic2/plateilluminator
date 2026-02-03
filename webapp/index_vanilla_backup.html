@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LED Program Configurator</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.2.0/css/all.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <!-- Add SortableJS -->
+    <style>
+        /* Style for LED buttons that have a program */
+        .led-button.has-program {
+            /* Using a prominent color for the outline. You can adjust this. */
+            outline: 2px solid #3273dc;
+            /* Bulma's primary blue color */
+            outline-offset: 2px;
+        }
+    </style>
+</head>
+
+<body>
+
+    <section class="section">
+        <div class="container is-fluid">
+            <h1 class="title has-text-centered">LED Program Configurator</h1>
+            <p class="subtitle has-text-centered">
+                Design programs for your 24-channel LED illuminator!
+            </p>
+            <!-- Add Dark Mode Toggle Button Here -->
+            <div class="has-text-centered mb-4"> <!-- Centering wrapper with margin-bottom -->
+                <button class="button" id="darkModeToggle">
+                    <span class="icon"><i class="fas fa-moon"></i></span>
+                    <span>Toggle Dark Mode</span>
+                </button>
+            </div>
+            <hr>
+
+            <!-- ROW 1: LED Selection and Step Editor -->
+            <div class="columns">
+                <!-- Left Pane: LED Grid -->
+                <div class="column is-one-third" id="led-grid-pane">
+                    <div class="box">
+                        <h2 class="title is-4 has-text-centered">LED Selection</h2>
+                        <!-- JavaScript will add LED grid here -->
+                        <!-- selectActionsContainer will be created by JS -->
+                    </div>
+                </div>
+
+                <!-- Right Pane: Step Editor -->
+                <div class="column is-two-thirds" id="step-editor-pane">
+                    <div class="box">
+                        <h2 class="title is-4 has-text-centered">Step Editor</h2>
+                        <!-- Step Type Dropdown -->
+                        <div class="field">
+                            <label class="label">Step Type</label>
+                            <div class="control">
+                                <div class="buttons has-addons is-centered" id="step-type-buttons">
+                                    <button class="button step-type-btn is-selected is-info" data-value="ON"
+                                        title="Constant ON">
+                                        <span class="icon"><i class="fas fa-lightbulb"></i></span>
+                                        <span>ON</span>
+                                    </button>
+                                    <button class="button step-type-btn" data-value="OFF" title="Turn OFF">
+                                        <span class="icon"><i class="fas fa-power-off"></i></span>
+                                        <span>OFF</span>
+                                    </button>
+                                    <button class="button step-type-btn" data-value="RAMP" title="Linear Ramp">
+                                        <span class="icon"><i class="fas fa-chart-line"></i></span>
+                                        <span>RAMP</span>
+                                    </button>
+                                    <button class="button step-type-btn" data-value="SINE" title="Sinusoidal Wave">
+                                        <span class="icon"><i class="fas fa-wave-square"></i></span>
+                                        <span>SINE</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Parameter fields for ON type -->
+                        <div id="params-on" class="step-params field-group">
+                            <div class="field">
+                                <label class="label">Intensity (int) <span
+                                        class="has-text-weight-normal is-size-7">µW/cm²</span></label>
+                                <div class="control">
+                                    <input id="on-int" class="input" type="number" placeholder="e.g., 1000" min="0"
+                                        value="1000">
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Parameter fields for RAMP type (initially hidden) -->
+                        <div id="params-ramp" class="step-params field-group" style="display:none;">
+                            <div class="field">
+                                <label class="label">Start Intensity (int0) <span
+                                        class="has-text-weight-normal is-size-7">µW/cm²</span></label>
+                                <div class="control">
+                                    <input id="ramp-int0" class="input" type="number" placeholder="e.g., 0" min="0"
+                                        value="0">
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label class="label">End Intensity (int1) <span
+                                        class="has-text-weight-normal is-size-7">µW/cm²</span></label>
+                                <div class="control">
+                                    <input id="ramp-int1" class="input" type="number" placeholder="e.g., 1000" min="0"
+                                        value="1000">
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Parameter fields for SINE type (initially hidden) -->
+                        <div id="params-sine" class="step-params field-group" style="display:none;">
+                            <div class="field">
+                                <label class="label">Min Intensity (int0) <span
+                                        class="has-text-weight-normal is-size-7">µW/cm²</span></label>
+                                <div class="control">
+                                    <input id="sine-int0" class="input" type="number" placeholder="e.g., 100" min="0"
+                                        value="100">
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label class="label">Max Intensity (int1) <span
+                                        class="has-text-weight-normal is-size-7">µW/cm²</span></label>
+                                <div class="control">
+                                    <input id="sine-int1" class="input" type="number" placeholder="e.g., 800" min="0"
+                                        value="800">
+                                </div>
+                            </div>
+                            <div class="field">
+                                <label class="label">Frequency (freq) <span class="has-text-weight-normal is-size-7">Hz
+                                        (Recommended max: ~250 Hz)</span></label>
+                                <div class="control">
+                                    <input id="sine-freq" class="input" type="number" placeholder="e.g., 1.0" step="0.1"
+                                        min="0" value="1.0">
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Common field: Duration (always visible for ON, RAMP, SINE) -->
+                        <div id="params-duration" class="field-group">
+                            <div class="field">
+                                <label class="label">Duration <span
+                                        class="has-text-weight-normal is-size-7">ms</span></label>
+                                <div class="control">
+                                    <input id="step-duration" class="input" type="number" placeholder="e.g., 1000"
+                                        min="0" value="1000">
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Add/Remove Step Buttons -->
+                        <div class="field is-grouped mt-4">
+                            <div class="control">
+                                <button class="button is-success" id="add-step-button">Add Step</button>
+                            </div>
+                            <div class="control">
+                                <button class="button is-danger" id="remove-step-button">Remove Last Step</button>
+                            </div>
+                        </div>
+                    </div> <!-- End of box for Step Editor -->
+                </div> <!-- End of column (Step Editor) -->
+            </div> <!-- END OF ROW 1 -->
+
+            <!-- ROW 1.5: Chunk Manager -->
+            <div class="columns">
+                <div class="column">
+                    <div class="box" id="chunk-manager-pane">
+                        <h3 class="title is-4 has-text-centered">Chunk Manager (<span id="chunk-led-label">No LED
+                                Selected</span>)</h3>
+
+                        <!-- Chunk Selector and Actions -->
+                        <div class="field is-grouped is-grouped-centered mb-4">
+                            <div class="control">
+                                <label class="label">Current Chunk:</label>
+                                <div class="select">
+                                    <select id="chunk-selector">
+                                        <option>No chunks yet</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="control">
+                                <button class="button is-success" id="add-chunk-button">
+                                    <span class="icon"><i class="fas fa-plus"></i></span>
+                                    <span>Add Chunk</span>
+                                </button>
+                            </div>
+                            <div class="control">
+                                <button class="button is-danger" id="remove-chunk-button">
+                                    <span class="icon"><i class="fas fa-trash"></i></span>
+                                    <span>Remove Chunk</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Chunk Configuration -->
+                        <div id="chunk-config-section" style="display: none;">
+                            <div class="field">
+                                <label class="label">Chunk Name (optional)</label>
+                                <div class="control">
+                                    <input class="input" type="text" id="chunk-name-input"
+                                        placeholder="e.g., Warm-up phase">
+                                </div>
+                            </div>
+
+                            <div class="field">
+                                <label class="label">Repeat Mode</label>
+                                <div class="control">
+                                    <div class="buttons has-addons is-centered" id="repeat-mode-buttons">
+                                        <button class="button repeat-mode-btn is-selected is-info" data-mode="once">
+                                            <span class="icon"><i class="fas fa-play-circle"></i></span>
+                                            <span>Once</span>
+                                        </button>
+                                        <button class="button repeat-mode-btn" data-mode="count">
+                                            <span class="icon"><i class="fas fa-redo"></i></span>
+                                            <span>Count</span>
+                                        </button>
+                                        <button class="button repeat-mode-btn" data-mode="duration">
+                                            <span class="icon"><i class="fas fa-clock"></i></span>
+                                            <span>Duration</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Repeat Count (hidden by default) -->
+                            <div class="field" id="repeat-count-field" style="display: none;">
+                                <label class="label">Repeat Count</label>
+                                <div class="control">
+                                    <input class="input" type="number" id="repeat-count-input" min="1" value="10"
+                                        placeholder="e.g., 10">
+                                </div>
+                                <p class="help">Number of times to repeat this chunk's steps</p>
+                            </div>
+
+                            <!-- Repeat Duration (hidden by default) -->
+                            <div class="field" id="repeat-duration-field" style="display: none;">
+                                <label class="label">Repeat Duration (minutes)</label>
+                                <div class="control">
+                                    <input class="input" type="number" id="repeat-duration-input" min="0" step="0.1"
+                                        value="1" placeholder="e.g., 5.5">
+                                </div>
+                                <p class="help">How long to repeat this chunk's steps (in minutes)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- END OF ROW 1.5 -->
+
+            <!-- ROW 2: Program Timeline -->
+            <div class="columns">
+                <div class="column">
+                    <div class="box" id="timeline-pane"> <!-- id="timeline-pane" is on the box -->
+                        <h3 class="title is-4 has-text-centered">
+                            Program Timeline (<span id="timeline-led-label">No LED Selected</span>)
+                        </h3>
+                        <div id="timeline-display"
+                            style="border: 1px solid #ccc; min-height: 150px; position: relative; overflow-x: auto; background-color: white;">
+                            <!-- JS will clear this and add timeline blocks -->
+                            <p class="has-text-centered has-text-grey p-4">Select an LED to see its program.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- END OF ROW 2 -->
+
+            <!-- ROW 3: Load and Export Buttons -->
+            <div class="columns is-centered"> <!-- is-centered for the column group -->
+                <div class="column is-narrow"> <!-- is-narrow to make the column fit its content -->
+                    <div class="field has-addons"> <!-- Group button and hidden input -->
+                        <div class="control">
+                            <!-- This is the visible button the user clicks -->
+                            <button class="button is-link" id="load-program-button">
+                                <span class="icon is-small">
+                                    <i class="fas fa-upload"></i> <!-- Font Awesome icon -->
+                                </span>
+                                <span>Load program.json</span>
+                            </button>
+                            <!-- This is the actual file input, hidden from view -->
+                            <input type="file" id="file-input" accept=".json" style="display: none;">
+                        </div>
+                    </div>
+                </div>
+                <div class="column is-narrow">
+                    <button class="button is-primary is-fullwidth" id="export-button">
+                        <span class="icon is-small">
+                            <i class="fas fa-download"></i> <!-- Font Awesome icon -->
+                        </span>
+                        <span>Export program.json</span>
+                    </button>
+                </div>
+            </div> <!-- END OF ROW 3 -->
+
+            <!-- Global Settings Row -->
+            <div class="columns is-centered mt-4">
+                <div class="column is-narrow has-text-centered">
+                    <label class="label">Total Run Time</label>
+                    <!-- Clickable Display Button -->
+                    <button class="time-picker-display" id="time-picker-display">
+                        <span class="icon"><i class="fas fa-clock"></i></span>
+                        <span id="time-display-text">00:00:00</span>
+                    </button>
+                    <p class="help mt-2">Click to set. 00:00:00 = no limit.</p>
+
+                    <!-- Hidden inputs for export compatibility -->
+                    <input type="hidden" id="run-time-hours" value="0">
+                    <input type="hidden" id="run-time-minutes" value="0">
+                    <input type="hidden" id="run-time-seconds" value="0">
+                </div>
+            </div>
+
+            <!-- Time Picker Modal -->
+            <div class="time-picker-modal-overlay" id="time-picker-modal">
+                <div class="time-picker-modal">
+                    <h3>Set Run Time</h3>
+                    <div class="time-spinners">
+                        <!-- Hours -->
+                        <div class="time-spinner">
+                            <button class="time-spinner-btn up" data-unit="hours">▲</button>
+                            <input type="number" class="time-spinner-value" id="spinner-hours" value="00" min="0"
+                                max="99">
+                            <button class="time-spinner-btn down" data-unit="hours">▼</button>
+                            <div class="time-spinner-label">Hours</div>
+                        </div>
+                        <div class="time-separator">:</div>
+                        <!-- Minutes -->
+                        <div class="time-spinner">
+                            <button class="time-spinner-btn up" data-unit="minutes">▲</button>
+                            <input type="number" class="time-spinner-value" id="spinner-minutes" value="00" min="0"
+                                max="59">
+                            <button class="time-spinner-btn down" data-unit="minutes">▼</button>
+                            <div class="time-spinner-label">Minutes</div>
+                        </div>
+                        <div class="time-separator">:</div>
+                        <!-- Seconds -->
+                        <div class="time-spinner">
+                            <button class="time-spinner-btn up" data-unit="seconds">▲</button>
+                            <input type="number" class="time-spinner-value" id="spinner-seconds" value="00" min="0"
+                                max="59">
+                            <button class="time-spinner-btn down" data-unit="seconds">▼</button>
+                            <div class="time-spinner-label">Seconds</div>
+                        </div>
+                    </div>
+                    <div class="time-picker-buttons">
+                        <button class="button is-success" id="time-picker-confirm">
+                            <span class="icon"><i class="fas fa-check"></i></span>
+                            <span>Confirm</span>
+                        </button>
+                        <button class="button" id="time-picker-cancel">Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+        </div> <!-- End of container is-fluid -->
+    </section>
+
+
+    <script src="script.js"></script>
+</body>
+
+</html>
