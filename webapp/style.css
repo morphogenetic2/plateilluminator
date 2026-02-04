@@ -801,3 +801,7 @@ input.compact-input {
     flex-wrap: wrap;
     align-items: flex-start;
 }
+
+/* Fix for uneditable inputs in editor */
+.editor-container { position: relative; z-index: 10; }
+.editor-container input, .editor-container select, .editor-container button { pointer-events: auto !important; }

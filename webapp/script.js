@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
         history: [], // Stack of programData strings
         lastClickedLedIndex: null, // For Shift+click range selection
         clipboard: null, // For copy/paste LED programs
+        fileHandle: null, // For File System Access API (Direct Save)
     };
 
     const DragSelect = {
@@ -221,7 +222,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const blockIdx = parseInt(btn.dataset.blockIndex);
                 const stepIdx = parseInt(btn.dataset.stepIndex);
-                blocks[blockIdx].steps.splice(stepIdx, 1);
+
+                // Apply to ALL selected LEDs (Batch delete step)
+                State.selectedLedIndices.forEach(ledIdx => {
+                    const targetLedData = State.programData[`LED${ledIdx}`];
+                    // Ensure the block and step exist for this LED
+                    if (targetLedData?.blocks && targetLedData.blocks[blockIdx]?.steps) {
+                        targetLedData.blocks[blockIdx].steps.splice(stepIdx, 1);
+                    }
+                });
+
                 renderTimeline();
                 updateAllLedProgramIndicators();
             });
@@ -479,15 +489,22 @@ document.addEventListener('DOMContentLoaded', () => {
         // If no index provided, use current (from button)
         const idxToRemove = targetBlockIdx !== null ? targetBlockIdx : State.currentblockIndex;
 
-        if (!confirm(`Remove block ${idxToRemove + 1}?`)) return;
+        if (!confirm(`Remove block ${idxToRemove + 1} from all ${State.selectedLedIndices.size} selected LEDs?`)) return;
 
         pushHistory();
 
-        ledData.blocks.splice(idxToRemove, 1);
+        // Apply to ALL selected LEDs (Batch delete block)
+        State.selectedLedIndices.forEach(ledIdx => {
+            const targetLedData = State.programData[`LED${ledIdx}`];
+            if (targetLedData?.blocks && targetLedData.blocks.length > idxToRemove) {
+                targetLedData.blocks.splice(idxToRemove, 1);
+            }
+        });
 
-        // Adjust current selection if needed
-        if (State.currentblockIndex >= ledData.blocks.length) {
-            State.currentblockIndex = Math.max(0, ledData.blocks.length - 1);
+        // Adjust current selection if needed for the VIEWED LED
+        const blocksAfter = State.programData[`LED${State.currentlyViewedLedIndex}`]?.blocks || [];
+        if (State.currentblockIndex >= blocksAfter.length) {
+            State.currentblockIndex = Math.max(0, blocksAfter.length - 1);
         } else if (idxToRemove < State.currentblockIndex) {
             // If we removed a block *before* the current one, decrement index
             State.currentblockIndex--;
@@ -922,6 +939,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         updateStepParams();
         updateEditButtonsUI();
+
+        // Ensure inputs are enabled
+        document.querySelectorAll('.editor-container input').forEach(el => el.disabled = false);
+
         renderTimeline(); // to show highlight
     }
 
@@ -1046,7 +1067,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Validation: Check if longest program exceeds total duration
         const longestProgramMinutes = findLongestProgramDuration();
 
-        if (longestProgramMinutes > totalMinutes) {
+        if (totalMinutes > 0 && longestProgramMinutes > totalMinutes) {
             const longestHours = Math.floor(longestProgramMinutes / 60);
             const longestMins = Math.floor(longestProgramMinutes % 60);
             const longestSecs = Math.round((longestProgramMinutes % 1) * 60);
@@ -1074,8 +1095,27 @@ document.addEventListener('DOMContentLoaded', () => {
         performExport(totalMinutes);
     }
 
+    function getExportData(totalMinutes) {
+        // Deep copy to avoid modifying state
+        const exportData = JSON.parse(JSON.stringify(State.programData));
+        exportData.total_duration_minutes = totalMinutes;
+
+        // Sanitize for firmware compatibility
+        for (const key in exportData) {
+            if (key.startsWith('LED') && exportData[key].blocks) {
+                exportData[key].blocks.forEach(block => {
+                    // Firmware expects repeat_count: 0 for infinite loops
+                    if (block.repeat_continuous) {
+                        block.repeat_count = 0;
+                    }
+                });
+            }
+        }
+        return exportData;
+    }
+
     function performExport(totalMinutes) {
-        const exportData = { ...State.programData, total_duration_minutes: totalMinutes };
+        const exportData = getExportData(totalMinutes);
         const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -1085,6 +1125,62 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.removeChild(a);
         URL.revokeObjectURL(a.href);
         alert('Exported program.json!');
+    }
+
+    async function saveToDevice() {
+        if (!('showSaveFilePicker' in window)) {
+            alert('Your browser does not support direct saving. Please use standard Export.');
+            return;
+        }
+
+        const h = parseInt(document.getElementById('run-time-hours').value) || 0;
+        const m = parseInt(document.getElementById('run-time-minutes').value) || 0;
+        const s = parseInt(document.getElementById('run-time-seconds').value) || 0;
+        const totalMinutes = parseFloat(((h * 60) + m + (s / 60)).toFixed(4));
+
+        const exportData = getExportData(totalMinutes);
+
+        try {
+            if (!State.fileHandle) {
+                State.fileHandle = await window.showSaveFilePicker({
+                    suggestedName: 'program.json',
+                    types: [{
+                        description: 'JSON Binary',
+                        accept: { 'application/json': ['.json'] },
+                    }],
+                });
+            }
+
+            // Check if we have permission to write
+            const options = { mode: 'readwrite' };
+            if (await State.fileHandle.queryPermission(options) !== 'granted') {
+                if (await State.fileHandle.requestPermission(options) !== 'granted') {
+                    alert('Permission denied.');
+                    return;
+                }
+            }
+
+            const writable = await State.fileHandle.createWritable();
+            await writable.write(JSON.stringify(exportData, null, 2));
+            await writable.close();
+
+            // Visual feedback
+            const btn = document.getElementById('save-device-btn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<i class="fas fa-check"></i> Saved!';
+            btn.style.color = 'var(--accent-success)';
+            setTimeout(() => {
+                btn.innerHTML = originalText;
+                btn.style.color = '';
+            }, 2000);
+
+        } catch (err) {
+            if (err.name !== 'AbortError') {
+                console.error('Save failed:', err);
+                alert('Save failed. Try choosing the file again.');
+                State.fileHandle = null;
+            }
+        }
     }
 
     function loadProgram(event) {
@@ -1244,6 +1340,7 @@ document.addEventListener('DOMContentLoaded', () => {
             loadProgram(e);
         });
         document.getElementById('export-btn')?.addEventListener('click', exportProgram);
+        document.getElementById('save-device-btn')?.addEventListener('click', saveToDevice);
 
         // Undo
         document.getElementById('undo-btn')?.addEventListener('click', undo);

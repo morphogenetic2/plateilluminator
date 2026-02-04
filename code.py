@@ -58,10 +58,11 @@ class LEDblock:
     """
     Represents a block (sequence) of steps with repeat logic.
     """
-    def __init__(self, steps, repeat_duration_minutes=None, repeat_count=None):
+    def __init__(self, steps, repeat_duration_minutes=None, repeat_count=None, repeat_continuous=False):
         self.steps = steps
         self.repeat_duration_minutes = repeat_duration_minutes
         self.repeat_count = repeat_count
+        self.repeat_continuous = repeat_continuous
         
         self.current_step_index = 0
         self.elapsed_in_step = 0  # ms
@@ -79,6 +80,10 @@ class LEDblock:
         """Check if this block has finished all its repetitions."""
         if not self.steps:
             return True
+
+        # Infinite loop
+        if self.repeat_continuous:
+            return False
             
         # Check duration-based completion
         if self.repeat_duration_minutes is not None and self.repeat_duration_minutes > 0:
@@ -91,7 +96,7 @@ class LEDblock:
             if self.repetition_count >= self.repeat_count:
                 return True
                 
-        # If neither repeat setting, block completes after one cycle
+        # If neither repeat setting, block completes after one cycle (unless continuous)
         if self.repeat_duration_minutes is None and self.repeat_count is None:
             if self.repetition_count >= 1:
                 return True
@@ -162,7 +167,7 @@ class LEDProgram:
         
         # Initialize first block
         if self.blocks:
-            self.blocks[0].reset(0)
+            self.blocks[0].reset(time.monotonic() * 1000)
 
     def update(self, dt_ms, current_time_ms):
         """
@@ -225,7 +230,8 @@ def convert_to_blocks(led_data):
             steps = block_data.get("steps", [])
             repeat_duration = block_data.get("repeat_duration_minutes")
             repeat_count = block_data.get("repeat_count")
-            blocks.append(LEDblock(steps, repeat_duration, repeat_count))
+            repeat_continuous = block_data.get("repeat_continuous", False)
+            blocks.append(LEDblock(steps, repeat_duration, repeat_count, repeat_continuous))
         return blocks
     elif isinstance(led_data, list):
         # Legacy format: convert entire step array to single block
