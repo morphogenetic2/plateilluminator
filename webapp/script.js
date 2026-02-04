@@ -1011,38 +1011,38 @@ document.addEventListener('DOMContentLoaded', () => {
     function calculateLedProgramDuration(ledData) {
         if (!ledData?.blocks || ledData.blocks.length === 0) return 0;
 
-        let totalMs = 0;
+        let totalS = 0;
 
         ledData.blocks.forEach(block => {
             const steps = block.steps || [];
-            const blockDurationMs = steps.reduce((sum, step) => sum + (step.duration_ms || 0), 0);
+            const blockDurationS = steps.reduce((sum, step) => sum + (step.duration_s || (step.duration_ms / 1000) || 0), 0);
 
             if (block.repeat_continuous) {
-                // For continuous blocks, we can't really calculate a total duration
-                // We'll just count one loop for export calculation purposes, 
-                // or maybe warn the user? For this purpose let's count 1 loop.
-                totalMs += blockDurationMs;
+                // For continuous blocks, we count one loop for export calculation purposes
+                totalS += blockDurationS;
             } else if (block.repeat_count) {
-                totalMs += blockDurationMs * block.repeat_count;
+                totalS += blockDurationS * block.repeat_count;
+            } else if (block.repeat_duration_s) {
+                totalS += block.repeat_duration_s;
             } else if (block.repeat_duration_minutes) {
-                totalMs += block.repeat_duration_minutes * 60 * 1000;
+                totalS += block.repeat_duration_minutes * 60;
             } else {
                 // Run once
-                totalMs += blockDurationMs;
+                totalS += blockDurationS;
             }
         });
 
-        return totalMs / 60000; // Convert to minutes
+        return totalS;
     }
 
     // Helper: Find longest program duration across all LEDs
     function findLongestProgramDuration() {
-        let maxDuration = 0;
+        let maxDurationS = 0;
         for (const ledKey in State.programData) {
-            const duration = calculateLedProgramDuration(State.programData[ledKey]);
-            if (duration > maxDuration) maxDuration = duration;
+            const durationS = calculateLedProgramDuration(State.programData[ledKey]);
+            if (durationS > maxDurationS) maxDurationS = durationS;
         }
-        return maxDuration;
+        return maxDurationS;
     }
 
     function exportProgram() {
@@ -1062,15 +1062,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const h = parseInt(document.getElementById('run-time-hours').value) || 0;
         const m = parseInt(document.getElementById('run-time-minutes').value) || 0;
         const s = parseInt(document.getElementById('run-time-seconds').value) || 0;
-        const totalMinutes = parseFloat(((h * 60) + m + (s / 60)).toFixed(4));
+        const totalSeconds = (h * 3600) + (m * 60) + s;
 
         // Validation: Check if longest program exceeds total duration
-        const longestProgramMinutes = findLongestProgramDuration();
+        const longestProgramSeconds = findLongestProgramDuration();
 
-        if (totalMinutes > 0 && longestProgramMinutes > totalMinutes) {
-            const longestHours = Math.floor(longestProgramMinutes / 60);
-            const longestMins = Math.floor(longestProgramMinutes % 60);
-            const longestSecs = Math.round((longestProgramMinutes % 1) * 60);
+        if (totalSeconds > 0 && longestProgramSeconds > totalSeconds) {
+            const longestHours = Math.floor(longestProgramSeconds / 3600);
+            const longestMins = Math.floor((longestProgramSeconds % 3600) / 60);
+            const longestSecs = Math.round(longestProgramSeconds % 60);
 
             const userChoice = confirm(
                 `⚠️ Duration Mismatch!\n\n` +
@@ -1086,24 +1086,40 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('run-time-seconds').value = longestSecs;
 
                 // Recalculate with new values
-                const adjustedTotal = parseFloat(((longestHours * 60) + longestMins + (longestSecs / 60)).toFixed(4));
-                performExport(adjustedTotal);
+                const adjustedTotalS = (longestHours * 3600) + (longestMins * 60) + longestSecs;
+                performExport(adjustedTotalS);
                 return;
             }
         }
 
-        performExport(totalMinutes);
+        performExport(totalSeconds);
     }
 
-    function getExportData(totalMinutes) {
+    function getExportData(totalSeconds) {
         // Deep copy to avoid modifying state
         const exportData = JSON.parse(JSON.stringify(State.programData));
-        exportData.total_duration_minutes = totalMinutes;
+        exportData.total_duration_s = totalSeconds;
 
         // Sanitize for firmware compatibility
         for (const key in exportData) {
             if (key.startsWith('LED') && exportData[key].blocks) {
                 exportData[key].blocks.forEach(block => {
+                    // Convert timing to seconds
+                    if (block.steps) {
+                        block.steps.forEach(step => {
+                            if (step.duration_ms !== undefined) {
+                                step.duration_s = step.duration_ms / 1000;
+                                delete step.duration_ms;
+                            }
+                        });
+                    }
+                    if (block.repeat_duration_minutes !== undefined) {
+                        if (block.repeat_duration_minutes !== null) {
+                            block.repeat_duration_s = block.repeat_duration_minutes * 60;
+                        }
+                        delete block.repeat_duration_minutes;
+                    }
+
                     // Firmware expects repeat_count: 0 for infinite loops
                     if (block.repeat_continuous) {
                         block.repeat_count = 0;
@@ -1114,8 +1130,8 @@ document.addEventListener('DOMContentLoaded', () => {
         return exportData;
     }
 
-    function performExport(totalMinutes) {
-        const exportData = getExportData(totalMinutes);
+    function performExport(totalSeconds) {
+        const exportData = getExportData(totalSeconds);
         const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
@@ -1136,9 +1152,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const h = parseInt(document.getElementById('run-time-hours').value) || 0;
         const m = parseInt(document.getElementById('run-time-minutes').value) || 0;
         const s = parseInt(document.getElementById('run-time-seconds').value) || 0;
-        const totalMinutes = parseFloat(((h * 60) + m + (s / 60)).toFixed(4));
+        const totalSeconds = (h * 3600) + (m * 60) + s;
 
-        const exportData = getExportData(totalMinutes);
+        const exportData = getExportData(totalSeconds);
 
         try {
             if (!State.fileHandle) {
@@ -1191,11 +1207,19 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.onload = (e) => {
             try {
                 const loaded = JSON.parse(e.target.result);
-                const totalMinutes = loaded.total_duration_minutes || 0;
-                delete loaded.total_duration_minutes;
 
-                // Convert and load
+                // Unified total duration in seconds
+                let totalSeconds = 0;
+                if (loaded.total_duration_s !== undefined) {
+                    totalSeconds = loaded.total_duration_s;
+                } else if (loaded.total_duration_minutes !== undefined) {
+                    totalSeconds = loaded.total_duration_minutes * 60;
+                }
+
+                // Clean State
+                State.programData = {};
                 for (const ledKey in loaded) {
+                    if (!ledKey.startsWith('LED')) continue;
                     const ledData = loaded[ledKey];
 
                     if (Array.isArray(ledData)) {
@@ -1203,12 +1227,29 @@ document.addEventListener('DOMContentLoaded', () => {
                         State.programData[ledKey] = {
                             blocks: [{
                                 id: 'block0',
-                                steps: ledData,
+                                steps: ledData.map(step => {
+                                    // Map old field names to internal state
+                                    if (step.duration_s !== undefined) step.duration_ms = step.duration_s * 1000;
+                                    return step;
+                                }),
                                 repeat_duration_minutes: null,
                                 repeat_count: null
                             }]
                         };
                     } else if (ledData?.blocks) {
+                        ledData.blocks.forEach(block => {
+                            // Map old field names to internal UI state
+                            if (block.repeat_duration_s !== undefined) {
+                                block.repeat_duration_minutes = block.repeat_duration_s / 60;
+                            }
+                            if (block.steps) {
+                                block.steps.forEach(step => {
+                                    if (step.duration_s !== undefined) {
+                                        step.duration_ms = step.duration_s * 1000;
+                                    }
+                                });
+                            }
+                        });
                         State.programData[ledKey] = ledData;
                     } else {
                         State.programData[ledKey] = { blocks: [] };
@@ -1222,11 +1263,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
 
-                // Update duration
-                const totalSeconds = Math.round(totalMinutes * 60);
+                // Update duration inputs
                 document.getElementById('run-time-hours').value = Math.floor(totalSeconds / 3600);
                 document.getElementById('run-time-minutes').value = Math.floor((totalSeconds % 3600) / 60);
-                document.getElementById('run-time-seconds').value = totalSeconds % 60;
+                document.getElementById('run-time-seconds').value = Math.floor(totalSeconds % 60);
 
                 State.currentblockIndex = 0;
                 updateAllLedProgramIndicators();
@@ -1495,55 +1535,54 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        tick(globalTime) {
+        tick(globalTimeS) {
             if (this.isDone) return 0;
 
             const block = this.blocks[this.blockIdx];
             if (!block || !block.steps || block.steps.length === 0) {
-                this.advanceBlock(globalTime);
+                this.advanceBlock(globalTimeS);
                 return 0; // Skip empty block
             }
 
             // Check block duration limit
-            if (block.repeat_duration_minutes) {
-                const blockDurationMs = block.repeat_duration_minutes * 60 * 1000;
-                if (globalTime - this.blockStartTime >= blockDurationMs) {
-                    this.advanceBlock(globalTime);
-                    return this.tick(globalTime);
+            const blockDurationS = block.repeat_duration_s || (block.repeat_duration_minutes * 60) || null;
+            if (blockDurationS) {
+                if (globalTimeS - this.blockStartTime >= blockDurationS) {
+                    this.advanceBlock(globalTimeS);
+                    return this.tick(globalTimeS);
                 }
             }
 
             const step = block.steps[this.stepIdx];
-            const timeInStep = globalTime - this.stepStartTime;
+            const stepDurationS = step.duration_s || (step.duration_ms / 1000) || 0;
+            const timeInStepS = globalTimeS - this.stepStartTime;
 
             // Calculate Intensity
             let val = 0;
             if (step.type === 'ON') val = step.int;
             else if (step.type === 'OFF') val = 0;
             else if (step.type === 'RAMP') {
-                const progress = Math.min(1, timeInStep / step.duration_ms);
+                const progress = Math.min(1, stepDurationS > 0 ? timeInStepS / stepDurationS : 1);
                 val = step.int0 + (step.int1 - step.int0) * progress;
             } else if (step.type === 'SINE') {
-                // SINE: freq in Hz. 2PI * freq * t(s)
-                // Map [-1, 1] to [min, max]
-                const tSec = timeInStep / 1000;
-                const sineVal = Math.sin(2 * Math.PI * step.freq * tSec); // -1 to 1
+                const tBlockS = globalTimeS - this.blockStartTime;
+                const sineVal = Math.sin(2 * Math.PI * step.freq * tBlockS); // -1 to 1
                 const amp = (step.int1 - step.int0) / 2;
-                const mid = step.int0 + amp;
-                val = mid + (sineVal * amp);
+                const midpoint = (step.int0 + step.int1) / 2;
+                val = midpoint + (sineVal * amp);
             }
 
             this.currentInt = val;
 
             // Check Step Complete
-            if (timeInStep >= step.duration_ms) {
-                this.advanceStep(globalTime);
+            if (timeInStepS >= stepDurationS) {
+                this.advanceStep(globalTimeS);
             }
 
             return Math.max(0, val);
         }
 
-        advanceStep(globalTime) {
+        advanceStep(globalTimeS) {
             this.stepIdx++;
             const block = this.blocks[this.blockIdx];
 
@@ -1557,25 +1596,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (this.blockLoopCount < block.repeat_count) {
                         this.stepIdx = 0; // Loop block
                     } else {
-                        this.advanceBlock(globalTime); // Done with this block
+                        this.advanceBlock(globalTimeS); // Done with this block
                     }
-                } else if (!block.repeat_duration_minutes) {
+                } else if (!block.repeat_duration_s && !block.repeat_duration_minutes) {
                     // Mode Once
-                    this.advanceBlock(globalTime);
+                    this.advanceBlock(globalTimeS);
                 } else {
                     // Mode Duration - just loop steps until duration cuts it off
                     this.stepIdx = 0;
                 }
             }
-            this.stepStartTime = globalTime;
+            this.stepStartTime = globalTimeS;
         }
 
-        advanceBlock(globalTime) {
+        advanceBlock(globalTimeS) {
             this.blockIdx++;
             this.stepIdx = 0;
             this.blockLoopCount = 0;
-            this.blockStartTime = globalTime;
-            this.stepStartTime = globalTime;
+            this.blockStartTime = globalTimeS;
+            this.stepStartTime = globalTimeS;
 
             if (this.blockIdx >= this.blocks.length) {
                 this.isDone = true;
@@ -1587,7 +1626,7 @@ document.addEventListener('DOMContentLoaded', () => {
         isActive: false,
         isPlaying: false,
         speed: 1,
-        currentTime: 0,
+        currentTimeS: 0,
         lastFrameTime: 0,
         runtimes: [], // Array of LedRuntime
         rafId: null,
@@ -1622,7 +1661,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         startSession() {
             this.isActive = true;
-            this.currentTime = 0;
+            this.currentTimeS = 0;
 
             // Backup and Clear Selection
             this.savedSelection = new Set(State.selectedLedIndices);
@@ -1653,7 +1692,7 @@ document.addEventListener('DOMContentLoaded', () => {
         stop() {
             this.pause();
             this.isActive = false;
-            this.currentTime = 0;
+            this.currentTimeS = 0;
             this.runtimes.forEach(r => r.reset());
             this.updateDisplay();
 
@@ -1684,39 +1723,32 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!this.isPlaying) return;
 
             const now = performance.now();
-            const realDelta = now - this.lastFrameTime;
+            const realDeltaS = (now - this.lastFrameTime) / 1000;
             this.lastFrameTime = now;
 
-            const simDelta = realDelta * this.speed;
-            this.currentTime += simDelta;
+            const simDeltaS = realDeltaS * this.speed;
+            this.currentTimeS += simDeltaS;
 
             // Tick runtimes
             let allDone = true;
             this.runtimes.forEach((rt, idx) => {
-                const intensity = rt.tick(this.currentTime); // 0-1400
+                const intensity = rt.tick(this.currentTimeS); // 0-1400
                 if (!rt.isDone) allDone = false;
 
-                // Visual update TARGETING MAIN GRID
-                // We need to find the correct button.
-                // The main grid buttons are .led-btn and have data-led-id
                 const el = allLedButtons[idx];
                 if (el) {
                     const norm = Math.min(1, intensity / 1400);
-
-                    // Visual calculation
                     const bgLightness = 10 + (norm * 50); // 10% to 60%
-
                     el.style.backgroundColor = `hsl(245, 50%, ${bgLightness}%)`;
                     el.style.boxShadow = `0 0 ${10 + (norm * 20)}px rgba(99, 102, 241, ${0.2 + (norm * 0.8)})`;
                     el.style.borderColor = `rgba(255,255,255,${0.1 + (norm * 0.9)})`;
                 }
             });
 
-            // Update Time Display
             this.updateTimeDisplay();
 
             if (allDone) {
-                this.pause();
+                this.stop();
             } else {
                 this.rafId = requestAnimationFrame(() => this.loop());
             }
@@ -1724,8 +1756,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
         updateDisplay() {
             this.updateTimeDisplay();
-            // Reset LEDs visual
-            // This is handled by stop() calling updateLedAppearances()
             if (!this.isActive) {
                 allLedButtons.forEach(el => {
                     el.style.backgroundColor = '';
@@ -1736,15 +1766,15 @@ document.addEventListener('DOMContentLoaded', () => {
         },
 
         updateTimeDisplay() {
-            const ms = this.currentTime;
-            const h = Math.floor(ms / 3600000);
-            const m = Math.floor((ms % 3600000) / 60000);
-            const s = Math.floor((ms % 60000) / 1000);
-            const sms = Math.floor(ms % 1000);
+            const totalS = this.currentTimeS;
+            const h = Math.floor(totalS / 3600);
+            const m = Math.floor((totalS % 3600) / 60);
+            const s = Math.floor(totalS % 60);
+            const ms = Math.floor((totalS % 1) * 1000);
 
             const pad = (n, z = 2) => n.toString().padStart(z, '0');
             document.getElementById('sim-time-display').textContent =
-                `${pad(h)}:${pad(m)}:${pad(s)}.${pad(sms, 3)}`;
+                `${pad(h)}:${pad(m)}:${pad(s)}.${pad(ms, 3)}`;
         }
     };
 

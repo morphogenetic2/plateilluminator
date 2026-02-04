@@ -11,7 +11,7 @@ import adafruit_tlc5947
 # Constants
 # -----------------------
 NUM_CHANNELS = 24  # Number of TLC5947 channels (24 LEDs)
-TICK_MS = 50  # Default update period. This value is overridden dynamically based on the program.json content: 50ms for animations (RAMP/SINE), or optimized for static steps (min 50ms).
+TICK_S = 0.05  # Default update period. This value is overridden dynamically based on the program.json content.
 SLEEP = 0.001 # time sleep in seconds to avoid CPU overload.
 
 # -----------------------
@@ -58,25 +58,25 @@ class LEDblock:
     """
     Represents a block (sequence) of steps with repeat logic.
     """
-    def __init__(self, steps, repeat_duration_minutes=None, repeat_count=None, repeat_continuous=False):
+    def __init__(self, steps, repeat_duration_s=None, repeat_count=None, repeat_continuous=False):
         self.steps = steps
-        self.repeat_duration_minutes = repeat_duration_minutes
+        self.repeat_duration_s = repeat_duration_s
         self.repeat_count = repeat_count
         self.repeat_continuous = repeat_continuous
         
         self.current_step_index = 0
-        self.elapsed_in_step = 0  # ms
+        self.elapsed_in_step = 0  # seconds
         self.block_start_time = 0  # Will be set when block becomes active
         self.repetition_count = 0  # How many times we've completed the step sequence
         
-    def reset(self, current_time_ms):
+    def reset(self, current_time_s):
         """Reset block to initial state."""
         self.current_step_index = 0
         self.elapsed_in_step = 0
-        self.block_start_time = current_time_ms
+        self.block_start_time = current_time_s
         self.repetition_count = 0
         
-    def is_complete(self, current_time_ms):
+    def is_complete(self, current_time_s):
         """Check if this block has finished all its repetitions."""
         if not self.steps:
             return True
@@ -86,9 +86,9 @@ class LEDblock:
             return False
             
         # Check duration-based completion
-        if self.repeat_duration_minutes is not None and self.repeat_duration_minutes > 0:
-            elapsed_minutes = (current_time_ms - self.block_start_time) / 60000.0
-            if elapsed_minutes >= self.repeat_duration_minutes:
+        if self.repeat_duration_s is not None and self.repeat_duration_s > 0:
+            elapsed_s = current_time_s - self.block_start_time
+            if elapsed_s >= self.repeat_duration_s:
                 return True
                 
         # Check count-based completion
@@ -97,13 +97,13 @@ class LEDblock:
                 return True
                 
         # If neither repeat setting, block completes after one cycle (unless continuous)
-        if self.repeat_duration_minutes is None and self.repeat_count is None:
+        if self.repeat_duration_s is None and self.repeat_count is None:
             if self.repetition_count >= 1:
                 return True
                 
         return False
         
-    def update_step(self, dt_ms):
+    def update_step(self, dt_s, current_time_s):
         """
         Update the current step within this block.
         Returns the current intensity.
@@ -113,13 +113,13 @@ class LEDblock:
             
         step = self.steps[self.current_step_index]
         step_type = step.get("type", StepType.OFF)
-        duration_ms = step.get("duration_ms", 0)
+        duration_s = step.get("duration_s", (step.get("duration_ms", 0) / 1000.0))
         
         # Update elapsed time in the current step
-        self.elapsed_in_step += dt_ms
+        self.elapsed_in_step += dt_s
         
         # Move to next step if the current one is complete
-        if self.elapsed_in_step >= duration_ms:
+        if duration_s > 0 and self.elapsed_in_step >= duration_s:
             self.current_step_index += 1
             self.elapsed_in_step = 0
             
@@ -140,7 +140,7 @@ class LEDblock:
         elif step_type == StepType.RAMP:
             int0 = step.get("int0", 0)
             int1 = step.get("int1", 0)
-            fraction = min(1.0, self.elapsed_in_step / duration_ms)
+            fraction = min(1.0, self.elapsed_in_step / duration_s) if duration_s > 0 else 1.0
             intensity = int0 + (int1 - int0) * fraction
         elif step_type == StepType.SINE:
             int0 = step.get("int0", 0)
@@ -148,8 +148,9 @@ class LEDblock:
             freq = step.get("freq", 1.0)
             amplitude = (int1 - int0) / 2
             midpoint = (int0 + int1) / 2
-            t = self.elapsed_in_step / 1000.0  # Time in seconds
-            intensity = midpoint + amplitude * math.sin(2 * math.pi * freq * t)
+            # For SINE wave continuity, use time since block started
+            t_block = current_time_s - self.block_start_time
+            intensity = midpoint + amplitude * math.sin(2 * math.pi * freq * t_block)
             
         return intensity
 
@@ -167,9 +168,9 @@ class LEDProgram:
         
         # Initialize first block
         if self.blocks:
-            self.blocks[0].reset(time.monotonic() * 1000)
+            self.blocks[0].reset(time.monotonic())
 
-    def update(self, dt_ms, current_time_ms):
+    def update(self, dt_s, current_time_s):
         """
         Update the LED's state based on elapsed time.
         Now handles block transitions.
@@ -187,7 +188,7 @@ class LEDProgram:
         current_block = self.blocks[self.current_block_index]
         
         # Check if current block is complete
-        if current_block.is_complete(current_time_ms):
+        if current_block.is_complete(current_time_s):
             # Move to next block
             self.current_block_index += 1
             
@@ -197,11 +198,11 @@ class LEDProgram:
                 return 0
             else:
                 # Initialize next block
-                self.blocks[self.current_block_index].reset(current_time_ms)
+                self.blocks[self.current_block_index].reset(current_time_s)
                 current_block = self.blocks[self.current_block_index]
         
         # Update current block and get intensity
-        self.current_intensity = current_block.update_step(dt_ms)
+        self.current_intensity = current_block.update_step(dt_s, current_time_s)
         return self.current_intensity
 
 # -----------------------
@@ -228,7 +229,7 @@ def convert_to_blocks(led_data):
         blocks = []
         for block_data in led_data["blocks"]:
             steps = block_data.get("steps", [])
-            repeat_duration = block_data.get("repeat_duration_minutes")
+            repeat_duration = block_data.get("repeat_duration_s", (block_data.get("repeat_duration_minutes", 0) * 60.0) if block_data.get("repeat_duration_minutes") else None)
             repeat_count = block_data.get("repeat_count")
             repeat_continuous = block_data.get("repeat_continuous", False)
             blocks.append(LEDblock(steps, repeat_duration, repeat_count, repeat_continuous))
@@ -237,7 +238,7 @@ def convert_to_blocks(led_data):
         # Legacy format: convert entire step array to single block
         # This block repeats until global timeout (handled by main loop)
         print("Legacy format detected - converting to single repeating block")
-        return [LEDblock(led_data, repeat_duration_minutes=None, repeat_count=None)]
+        return [LEDblock(led_data, repeat_duration_s=None, repeat_count=None)]
     else:
         return []
 
@@ -271,60 +272,58 @@ for i in range(NUM_CHANNELS):
             if s_type in ["RAMP", "SINE"]:
                 animation_led_indices.add(i)
 
-# Decide TICK_MS
+# Decide TICK_S
 animation_led_count = len(animation_led_indices)
 
 if animation_led_count > 0:
     # Calculate TICK based on number of animation LEDs
     # ~1.75ms per LED for SPI update, minimum 5ms floor
     import math
-    calculated_tick = math.ceil(1.75 * animation_led_count)
-    TICK_MS = max(5, calculated_tick)
-    print(f"Dynamic TICK: Found {animation_led_count} LEDs with RAMP/SINE. Setting TICK_MS = {TICK_MS}")
+    calculated_tick_ms = math.ceil(1.75 * animation_led_count)
+    TICK_S = max(0.005, calculated_tick_ms / 1000.0)
+    print(f"Dynamic TICK: Found {animation_led_count} LEDs with RAMP/SINE. Setting TICK_S = {TICK_S}")
 elif min_duration != float("inf"):
     # Static program: use step duration as tick (min 50ms, max 1000ms)
-    tick_candidate = max(50, int(min_duration))
-    TICK_MS = min(tick_candidate, 1000)  # Cap at 1 second for responsiveness
-    print(f"Dynamic TICK: Static program. Setting TICK_MS = {TICK_MS}")
+    tick_candidate_ms = max(50, int(min_duration))
+    TICK_S = min(tick_candidate_ms, 1000) / 1000.0
+    print(f"Dynamic TICK: Static program. Setting TICK_S = {TICK_S}")
 else:
-    TICK_MS = 50  # Default safe fallback
-    print("Dynamic TICK: Defaulting to 50")
+    TICK_S = 0.05  # Default safe fallback
+    print("Dynamic TICK: Defaulting to 0.05")
 
-# Global Experiment Duration (in minutes, 0 or None means infinite)
-total_duration_minutes = program_data.get("total_duration_minutes", 0)
-print(f"Global experiment duration: {total_duration_minutes} minutes")
+# Global Experiment Duration (in seconds, 0 or None means infinite)
+total_duration_s = program_data.get("total_duration_s", (program_data.get("total_duration_minutes", 0) * 60) if program_data.get("total_duration_minutes") else 0)
+print(f"Global experiment duration: {total_duration_s} seconds")
 
 # -----------------------
 # Main Control Loop
 # -----------------------
 print("Starting LED control loop...")
 
-last_time = time.monotonic() * 1000
+last_time = time.monotonic()
 experiment_start_time = time.monotonic()
 experiment_finished = False
 
 while True:
-    now = time.monotonic() * 1000
+    now = time.monotonic()
     elapsed = now - last_time
     
-    if elapsed >= TICK_MS:
+    if elapsed >= TICK_S:
         last_time = now
         
         # Update each LED program and set intensity
         for i in range(NUM_CHANNELS):
             # Check global timeout
-            if not experiment_finished and total_duration_minutes > 0:
+            if not experiment_finished and total_duration_s > 0:
                 total_elapsed_sec = time.monotonic() - experiment_start_time
-                if total_elapsed_sec >= (total_duration_minutes * 60):
+                if total_elapsed_sec >= total_duration_s:
                     print("Global experiment time reached. Turning off all LEDs.")
                     experiment_finished = True
             
             if experiment_finished:
                  uw_intensity = 0
             else:
-                 # BUGFIX: Pass actual elapsed time, not target TICK_MS
-                 # This ensures SINE/RAMP calculations use real-world timing
-                 # Also pass current time for block completion tracking
+                 # Pass actual elapsed time and current time
                  uw_intensity = led_programs[i].update(elapsed, now)  # µW/cm²
             
             led[i] = uw_cm2_to_pwm(uw_intensity, i)  # Set PWM directly (12-bit)
