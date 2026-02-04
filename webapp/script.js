@@ -486,8 +486,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const ledData = State.programData[`LED${State.currentlyViewedLedIndex}`];
         if (!ledData.blocks || ledData.blocks.length === 0) return;
 
-        // If no index provided, use current (from button)
-        const idxToRemove = targetBlockIdx !== null ? targetBlockIdx : State.currentblockIndex;
+        // If no index provided (or if passed an Event object), use current index
+        const idxToRemove = (typeof targetBlockIdx === 'number') ? targetBlockIdx : State.currentblockIndex;
 
         if (!confirm(`Remove block ${idxToRemove + 1} from all ${State.selectedLedIndices.size} selected LEDs?`)) return;
 
