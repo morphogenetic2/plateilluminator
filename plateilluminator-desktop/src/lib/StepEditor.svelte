@@ -66,7 +66,7 @@
                 <button
                     class="segment-btn"
                     class:is-selected={$currentStepType === t.id}
-                    on:click={() => currentStepType.set(t.id)}
+                    onclick={() => currentStepType.set(t.id)}
                 >
                     <i class={t.icon}></i>
                     {t.id}
@@ -166,7 +166,7 @@
     {/if}
 
     <div style="margin-top: auto; display: flex; gap: 8px;">
-        <button class="btn-primary" on:click={addStep} style="flex: 1;">
+        <button class="btn-primary" onclick={addStep} style="flex: 1;">
             <i class="fas fa-plus-circle"></i> Add Step
         </button>
     </div>

@@ -93,9 +93,9 @@
     role="grid"
     tabindex="0"
     aria-label="LED selection grid"
-    on:pointerdown={handlePointerDown}
-    on:pointermove={handlePointerMove}
-    on:pointerup={handlePointerUp}
+    onpointerdown={handlePointerDown}
+    onpointermove={handlePointerMove}
+    onpointerup={handlePointerUp}
 >
     <div class="led-grid" role="row">
         {#each Array(NUM_LEDS) as _, i}
@@ -107,7 +107,7 @@
                 style={$simIntensities[i] > 0
                     ? `background: hsl(245, 50%, ${10 + Math.min(1, $simIntensities[i] / 1400) * 50}%); box-shadow: 0 0 ${10 + Math.min(1, $simIntensities[i] / 1400) * 20}px rgba(99, 102, 241, 0.8);`
                     : ""}
-                on:click={(e) => selectLed(i, e.ctrlKey || e.metaKey)}
+                onclick={(e) => selectLed(i, e.ctrlKey || e.metaKey)}
                 aria-label={`LED ${i + 1}`}
                 aria-pressed={$selectedLedIndices.has(i)}
             >
@@ -131,9 +131,9 @@
 </div>
 
 <div class="led-actions">
-    <button class="segment-btn" on:click={toggleAll}>All / None</button>
+    <button class="segment-btn" onclick={toggleAll}>All / None</button>
     <button
         class="segment-btn"
-        on:click={() => selectedLedIndices.set(new Set())}>Clear</button
+        onclick={() => selectedLedIndices.set(new Set())}>Clear</button
     >
 </div>

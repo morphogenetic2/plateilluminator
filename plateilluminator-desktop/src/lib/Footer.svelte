@@ -215,14 +215,14 @@
             <button
                 class="control-btn small"
                 title="Stop/Reset"
-                on:click={stopSim}
+                onclick={stopSim}
             >
                 <i class="fas fa-stop"></i>
             </button>
             <button
                 class="control-btn primary"
                 title="Play/Pause"
-                on:click={togglePlay}
+                onclick={togglePlay}
             >
                 <i class={isPlaying ? "fas fa-pause" : "fas fa-play"}></i>
             </button>
@@ -234,7 +234,7 @@
                     <button
                         class="segment-btn"
                         class:is-selected={simSpeed === speed}
-                        on:click={() => (simSpeed = speed)}>{speed}x</button
+                        onclick={() => (simSpeed = speed)}>{speed}x</button
                     >
                 {/each}
             </div>
@@ -244,19 +244,19 @@
             style="width: 1px; background: var(--border-subtle); height: 24px; margin: 0 8px;"
         ></div>
 
-        <button class="segment-btn" on:click={handleLoad}>
+        <button class="segment-btn" onclick={handleLoad}>
             <i class="fas fa-folder-open"></i> Load
         </button>
         <button
             class="segment-btn"
-            on:click={saveToDevice}
+            onclick={saveToDevice}
             title="Direct save to flash drive"
         >
             <i class="fas fa-microchip"></i> Save to Device
         </button>
         <button
             class="btn-primary"
-            on:click={exportProgram}
+            onclick={exportProgram}
             style="padding: 0.6rem 1rem; font-size: 0.85rem;"
         >
             <i class="fas fa-download"></i> Export
@@ -265,7 +265,7 @@
             type="file"
             id="file-input"
             accept=".json"
-            on:change={onFileChange}
+            onchange={onFileChange}
             style="display: none;"
         />
     </div>

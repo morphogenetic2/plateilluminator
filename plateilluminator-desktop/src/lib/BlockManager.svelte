@@ -64,12 +64,12 @@
                 <option disabled>No blocks</option>
             {/if}
         </select>
-        <button class="btn-icon success" on:click={addBlock} title="New Block">
+        <button class="btn-icon success" onclick={addBlock} title="New Block">
             <i class="fas fa-plus"></i></button
         >
         <button
             class="btn-icon danger"
-            on:click={removeBlock}
+            onclick={removeBlock}
             title="Delete Block"
         >
             <i class="fas fa-trash"></i></button
@@ -92,23 +92,23 @@
             <button
                 class="segment-btn"
                 class:is-selected={currentBlock.repeat_continuous}
-                on:click={() => setRepeatMode("continuous")}>Cont.</button
+                onclick={() => setRepeatMode("continuous")}>Cont.</button
             >
             <button
                 class="segment-btn"
                 class:is-selected={currentBlock.repeat_once}
-                on:click={() => setRepeatMode("once")}>Once</button
+                onclick={() => setRepeatMode("once")}>Once</button
             >
             <button
                 class="segment-btn"
                 class:is-selected={currentBlock.repeat_count !== null}
-                on:click={() => setRepeatMode("count")}>Count</button
+                onclick={() => setRepeatMode("count")}>Count</button
             >
             <button
                 class="segment-btn"
                 class:is-selected={currentBlock.repeat_duration_minutes !==
                     null}
-                on:click={() => setRepeatMode("duration")}>Dur.</button
+                onclick={() => setRepeatMode("duration")}>Dur.</button
             >
         </div>
     </div>

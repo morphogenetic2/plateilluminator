@@ -78,9 +78,13 @@
                                 deleteBlock(bIdx);
                             }}
                             aria-label={`Delete ${block.id || `Block ${bIdx + 1}`}`}
-                            style="opacity: 1; color: var(--accent-danger); cursor: pointer;"
+                            style="opacity: 1; color: var(--accent-danger); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; width: 14px; height: 14px; border-radius: 50%;"
                         >
-                            <i class="fas fa-times" aria-hidden="true"></i>
+                            <i
+                                class="fas fa-times"
+                                aria-hidden="true"
+                                style="font-size: 10px;"
+                            ></i>
                         </button>
                     </div>
                     {#if block.repeat_continuous}
