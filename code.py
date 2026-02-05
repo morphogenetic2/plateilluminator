@@ -37,13 +37,63 @@ except OSError:
     print("No calibration.json found. Defaulting to calibration factors of 1.0 for all LEDs.")
     calibration = {str(i): 1.0 for i in range(NUM_CHANNELS)}  # Default to 1.0 for all LEDs
 
+# -----------------------
+# Calibration Curve (uW/cm^2 -> PWM)
+# Points: (0,0), (6.79,10), (18.2,50), (70,100), (355,500), (1390,2000), (2820,4095)
+# -----------------------
+CALIBRATION_CURVE = [
+    (0, 0),
+    (6.79, 10),
+    (18.2, 50),
+    (70, 100),
+    (355, 500),
+    (1390, 2000),
+    (2820, 4095)
+]
+
+def interpolate_pwm(target_uw, curve):
+    """
+    Interpolate PWM value from the provided calibration curve.
+    Curve must be a list of (uW, PWM) tuples sorted by uW.
+    """
+    # Handle out of bounds
+    if target_uw <= 0:
+        return 0
+    if not curve:
+        return 0
+        
+    if target_uw >= curve[-1][0]:
+        return curve[-1][1]
+
+    # Find the segment
+    for i in range(len(curve) - 1):
+        p1 = curve[i]
+        p2 = curve[i+1]
+        
+        if p1[0] <= target_uw <= p2[0]:
+            # Linear interpolation: y = y1 + (x - x1) * (y2 - y1) / (x2 - x1)
+            fraction = (target_uw - p1[0]) / (p2[0] - p1[0])
+            pwm = p1[1] + fraction * (p2[1] - p1[1])
+            return int(pwm)
+    
+    return 4095 # Should not happen given checks above
+
 def uw_cm2_to_pwm(led_uwcm2, led_index):
     """
-    Convert intensity in µW/cm² to 12-bit PWM using calibration factors.
+    Convert intensity in µW/cm² to 12-bit PWM using calibration data.
+    Supports both legacy (single factor) and new (curve) formats.
     """
-    calib_factor = calibration.get(str(led_index), 1.0)  # Default to 1.0 if not in calibration
-    led_pwm = int(led_uwcm2 * calib_factor * 2.8833333)
-    return max(0, min(4095, led_pwm))  # Clamp to 12-bit range
+    calib_data = calibration.get(str(led_index), 1.0)
+    
+    if isinstance(calib_data, list):
+        # New Format: Specific Curve for this LED
+        # calib_data is [[uW, PWM], [uW, PWM], ...]
+        return int(interpolate_pwm(led_uwcm2, calib_data))
+    else:
+        # Legacy/Default Format: Single Factor + Default Curve
+        # calib_data is a float (factor)
+        effective_target_uw = led_uwcm2 * float(calib_data)
+        return int(interpolate_pwm(effective_target_uw, CALIBRATION_CURVE))
 
 # -----------------------
 # LED Program and Control

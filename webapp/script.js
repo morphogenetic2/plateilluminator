@@ -984,13 +984,13 @@ document.addEventListener('DOMContentLoaded', () => {
         const step = { type: State.currentStepType, duration_ms: duration };
 
         if (State.currentStepType === 'ON') {
-            step.int = Math.min(1400, Math.max(0, parseInt(document.getElementById('on-int').value) || 0));
+            step.int = Math.min(3000, Math.max(0, parseInt(document.getElementById('on-int').value) || 0));
         } else if (State.currentStepType === 'RAMP') {
-            step.int0 = Math.min(1400, Math.max(0, parseInt(document.getElementById('ramp-int0').value) || 0));
-            step.int1 = Math.min(1400, Math.max(0, parseInt(document.getElementById('ramp-int1').value) || 0));
+            step.int0 = Math.min(3000, Math.max(0, parseInt(document.getElementById('ramp-int0').value) || 0));
+            step.int1 = Math.min(3000, Math.max(0, parseInt(document.getElementById('ramp-int1').value) || 0));
         } else if (State.currentStepType === 'SINE') {
-            step.int0 = Math.min(1400, Math.max(0, parseInt(document.getElementById('sine-int0').value) || 0));
-            step.int1 = Math.min(1400, Math.max(0, parseInt(document.getElementById('sine-int1').value) || 0));
+            step.int0 = Math.min(3000, Math.max(0, parseInt(document.getElementById('sine-int0').value) || 0));
+            step.int1 = Math.min(3000, Math.max(0, parseInt(document.getElementById('sine-int1').value) || 0));
             step.freq = Math.min(20, Math.max(0, parseFloat(document.getElementById('sine-freq').value) || 1));
         }
         return step;
@@ -1347,8 +1347,8 @@ document.addEventListener('DOMContentLoaded', () => {
         ['on-int', 'ramp-int0', 'ramp-int1', 'sine-int0', 'sine-int1'].forEach(id => {
             document.getElementById(id)?.addEventListener('blur', (e) => {
                 let val = parseInt(e.target.value);
-                if (val > 1400) {
-                    e.target.value = 1400;
+                if (val > 3000) {
+                    e.target.value = 3000;
                 }
             });
         });
@@ -1732,12 +1732,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // Tick runtimes
             let allDone = true;
             this.runtimes.forEach((rt, idx) => {
-                const intensity = rt.tick(this.currentTimeS); // 0-1400
+                const intensity = rt.tick(this.currentTimeS); // 0-3000
                 if (!rt.isDone) allDone = false;
 
                 const el = allLedButtons[idx];
                 if (el) {
-                    const norm = Math.min(1, intensity / 1400);
+                    const norm = Math.min(1, intensity / 3000);
                     const bgLightness = 10 + (norm * 50); // 10% to 60%
                     el.style.backgroundColor = `hsl(245, 50%, ${bgLightness}%)`;
                     el.style.boxShadow = `0 0 ${10 + (norm * 20)}px rgba(99, 102, 241, ${0.2 + (norm * 0.8)})`;
