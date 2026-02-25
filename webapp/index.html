@@ -9,7 +9,9 @@
     <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600&family=Outfit:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
 
     <!-- Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -149,48 +151,46 @@
                 </div>
 
                 <!-- Column 2: block Manager -->
-                <div class="editor-column" style="border-left: 1px solid var(--border-subtle); padding-left: 2rem;">
+                <div class="editor-column block-manager-column">
                     <div class="panel-title">
-                        <span>block Manager <span id="block-led-label" style="color: var(--primary);"></span></span>
+                        <span>block Manager <span id="block-led-label" class="led-context-label"></span></span>
                         <i class="fas fa-layer-group"></i>
                     </div>
 
-                    <div class="control-group">
-                        <select id="block-selector" style="flex:1;"></select>
+                    <div class="control-group block-selector-row">
+                        <select id="block-selector" class="block-selector-input"></select>
                         <button class="btn-icon success" id="add-block-btn" title="New block"><i
                                 class="fas fa-plus"></i></button>
                         <button class="btn-icon danger" id="remove-block-btn" title="Delete block"><i
                                 class="fas fa-trash"></i></button>
                     </div>
 
-                    <div class="control-group">
+                    <div class="control-group block-field">
                         <span class="label-text">Name</span>
-                        <input type="text" id="block-name-input" placeholder="block Name" style="flex:1;">
+                        <input type="text" id="block-name-input" class="block-name-input" placeholder="block Name">
                     </div>
 
-                    <div class="control-group">
+                    <div class="control-group block-field">
                         <span class="label-text">Repeat</span>
-                        <div class="segmented-control" style="flex:1;">
-                            <button class="segment-btn repeat-mode-btn" data-mode="continuous"
-                                style="flex:1; justify-content: center;">Cont.</button>
-                            <button class="segment-btn repeat-mode-btn" data-mode="once"
-                                style="flex:1; justify-content: center;">Once</button>
-                            <button class="segment-btn repeat-mode-btn" data-mode="count"
-                                style="flex:1; justify-content: center;">Count</button>
-                            <button class="segment-btn repeat-mode-btn" data-mode="duration"
-                                style="flex:1; justify-content: center;">Duration</button>
+                        <div class="segmented-control repeat-mode-control">
+                            <button class="segment-btn repeat-mode-btn repeat-mode-option" data-mode="continuous">Cont.</button>
+                            <button class="segment-btn repeat-mode-btn repeat-mode-option" data-mode="once">Once</button>
+                            <button class="segment-btn repeat-mode-btn repeat-mode-option" data-mode="count">Count</button>
+                            <button class="segment-btn repeat-mode-btn repeat-mode-option" data-mode="duration">Duration</button>
                         </div>
                     </div>
 
-                    <div class="control-group" id="repeat-count-field" style="display: none;">
+                    <div class="control-group block-field inline-input" id="repeat-count-field" style="display: none;">
                         <span class="label-text">Count</span>
-                        <input type="number" id="repeat-count-input" class="compact-input" value="10" min="1">
-                        <span class="input-suffix">times</span>
+                        <div class="inline-input-wrap">
+                            <input type="number" id="repeat-count-input" class="compact-input" value="10" min="1">
+                            <span class="input-suffix">times</span>
+                        </div>
                     </div>
 
-                    <div class="control-group" id="repeat-duration-field" style="display: none;">
+                    <div class="control-group block-field" id="repeat-duration-field" style="display: none;">
                         <span class="label-text">For</span>
-                        <div class="duration-dropdown" id="repeat-duration-picker">
+                        <div class="duration-dropdown block-duration-dropdown" id="repeat-duration-picker">
                             <button type="button" id="repeat-duration-trigger" class="duration-dropdown-trigger"
                                 aria-haspopup="true" aria-expanded="false">
                                 <span id="repeat-duration-display">00 : 01 : 00</span>
@@ -212,8 +212,7 @@
                                         <input type="number" id="repeat-duration-seconds" min="0" max="59" value="0">
                                     </div>
                                 </div>
-                                <button type="button" id="repeat-duration-apply-btn" class="segment-btn"
-                                    style="justify-content: center;">
+                                <button type="button" id="repeat-duration-apply-btn" class="segment-btn duration-apply-btn">
                                     Apply
                                 </button>
                             </div>
@@ -247,7 +246,7 @@
         <!-- Footer / IO -->
         <div class="panel io-bar">
             <div class="io-controls">
-                <div class="io-controls">
+                <div class="io-actions">
 
                     <!-- Playback Cluster -->
                     <div class="playback-cluster">
@@ -275,14 +274,17 @@
                     <button class="segment-btn" id="save-device-btn" title="Direct save to flash drive">
                         <i class="fas fa-microchip"></i> Save to Device
                     </button>
-                    <button class="btn-primary" id="export-btn" style="padding: 0.6rem 1rem; font-size: 0.85rem;">
+                    <button class="btn-primary" id="export-btn">
                         <i class="fas fa-download"></i> Export
                     </button>
                     <input type="file" id="file-input" accept=".json" style="display: none;">
                 </div>
 
                 <div class="duration-display" id="total-duration-control">
-                    <label>TOTAL DURATION</label>
+                    <div class="duration-display-header">
+                        <label>TOTAL DURATION</label>
+                        <span id="total-duration-hint" class="duration-display-hint">Applies only to continuous-only programs.</span>
+                    </div>
                     <div class="duration-dropdown duration-dropdown-wide duration-dropdown-up" id="run-time-picker">
                         <button type="button" id="run-time-trigger" class="duration-dropdown-trigger"
                             aria-haspopup="true" aria-expanded="false">
@@ -305,8 +307,7 @@
                                     <input type="number" id="run-time-seconds" min="0" max="59" value="0">
                                 </div>
                             </div>
-                            <button type="button" id="run-time-apply-btn" class="segment-btn"
-                                style="justify-content: center;">
+                            <button type="button" id="run-time-apply-btn" class="segment-btn duration-apply-btn">
                                 Apply
                             </button>
                         </div>

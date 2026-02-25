@@ -86,6 +86,7 @@
         const shouldEnable = analysis.hasContinuousBlocks && !analysis.hasNonContinuousBlocks;
         const shouldLock = !shouldEnable;
         const container = document.getElementById('total-duration-control');
+        const hint = document.getElementById('total-duration-hint');
         const trigger = document.getElementById('run-time-trigger');
         const menu = document.getElementById('run-time-menu');
         const applyBtn = document.getElementById('run-time-apply-btn');
@@ -110,6 +111,16 @@
         if (shouldLock) {
             fields.forEach(field => field.value = 0);
             syncRunTimePickerFromFields();
+        }
+
+        if (hint) {
+            if (shouldEnable) {
+                hint.textContent = 'Set a stop time or leave 00:00:00 for continuous run.';
+            } else if (!analysis.hasContinuousBlocks) {
+                hint.textContent = 'Disabled: add a continuous block to use total duration.';
+            } else {
+                hint.textContent = 'Disabled: once/count/duration blocks override total duration.';
+            }
         }
 
         if (warningEl) {

@@ -236,15 +236,15 @@ const Simulator = {
             const intensity = rt.tick(this.currentTimeS); // 0-3000
             if (!rt.isDone) allDone = false;
 
-            const el = Runtime.allLedButtons[idx];
-            if (el) {
-                const norm = Math.min(1, intensity / 3000);
-                const bgLightness = 10 + (norm * 50); // 10% to 60%
-                el.style.backgroundColor = `hsl(245, 50%, ${bgLightness}%)`;
-                el.style.boxShadow = `0 0 ${10 + (norm * 20)}px rgba(99, 102, 241, ${0.2 + (norm * 0.8)})`;
-                el.style.borderColor = `rgba(255,255,255,${0.1 + (norm * 0.9)})`;
-            }
-        });
+                const el = Runtime.allLedButtons[idx];
+                if (el) {
+                    const norm = Math.min(1, intensity / 3000);
+                    const bgLightness = 10 + (norm * 50); // 10% to 60%
+                    el.style.backgroundColor = `hsl(172, 56%, ${bgLightness}%)`;
+                    el.style.boxShadow = `0 0 ${10 + (norm * 20)}px rgba(20, 184, 166, ${0.2 + (norm * 0.8)})`;
+                    el.style.borderColor = `rgba(255,255,255,${0.1 + (norm * 0.9)})`;
+                }
+            });
 
         this.updateTimeDisplay();
 

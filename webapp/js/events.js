@@ -34,6 +34,18 @@
     function updateTotalDurationAvailability() {
         return fn.updateTotalDurationAvailability ? fn.updateTotalDurationAvailability() : undefined;
     }
+    function copySelectedBlocks() {
+        return fn.copySelectedBlocks ? fn.copySelectedBlocks() : false;
+    }
+    function getBlockClipboardPayload() {
+        return fn.getBlockClipboardPayload ? fn.getBlockClipboardPayload() : null;
+    }
+    function applyBlockPayloadToLed(ledIndex, payload) {
+        return fn.applyBlockPayloadToLed ? fn.applyBlockPayloadToLed(ledIndex, payload) : false;
+    }
+    function showTopToast(message) {
+        return fn.showTopToast ? fn.showTopToast(message) : undefined;
+    }
 
     function wireDurationDropdown(opts) {
         const picker = document.getElementById(opts.pickerId);
@@ -256,7 +268,13 @@ function initEventHandlers() {
         }
 
         // Ctrl+C: Copy current LED program
-        if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'c') {
+            const copiedBlocks = copySelectedBlocks();
+            if (copiedBlocks) {
+                e.preventDefault();
+                return;
+            }
+
             e.preventDefault();
             if (State.currentlyViewedLedIndex !== null) {
                 const ledKey = `LED${State.currentlyViewedLedIndex}`;
@@ -264,6 +282,7 @@ function initEventHandlers() {
 
                 // Deep copy the LED program
                 State.clipboard = JSON.parse(JSON.stringify(ledData || { blocks: [] }));
+                State.lastCopyKind = 'program';
 
                 // Visual feedback
                 const timelineLabel = document.getElementById('timeline-label');
@@ -280,7 +299,21 @@ function initEventHandlers() {
         }
 
         // Ctrl+V: Paste to selected LEDs
-        if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'v') {
+            if (State.lastCopyKind === 'block') {
+                const blockPayload = getBlockClipboardPayload();
+                const targetLed = State.currentlyViewedLedIndex ?? [...State.selectedLedIndices][0] ?? null;
+
+                if (blockPayload?.blocks?.length && targetLed !== null) {
+                    e.preventDefault();
+                    const applied = applyBlockPayloadToLed(targetLed, blockPayload);
+                    if (applied) {
+                        showTopToast('paste');
+                        return;
+                    }
+                }
+            }
+
             e.preventDefault();
             if (State.clipboard && State.selectedLedIndices.size > 0) {
                 // Check if clipboard is empty (no blocks or only empty blocks)

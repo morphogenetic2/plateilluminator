@@ -11,6 +11,8 @@
     Object.assign(App.state, {
         programData: {},
         selectedLedIndices: new Set(),
+        selectedBlockIndices: new Set(),
+        blockSelectionLedIndex: null,
         currentlyViewedLedIndex: null,
         currentblockIndex: 0,
         currentStepType: 'ON',
@@ -18,6 +20,8 @@
         history: [],
         lastClickedLedIndex: null,
         clipboard: null,
+        blockClipboard: null,
+        lastCopyKind: null,
         fileHandle: null,
     });
 
@@ -37,8 +41,12 @@
 
     Object.assign(App.runtime, {
         timelineSortableInstance: null,
+        timelineSortableInstances: [],
         blockSortableInstance: null,
         allLedButtons: [],
+        blockSelectDrag: null,
+        blockDragPayload: null,
+        toastTimeoutId: null,
     });
 
     const State = App.state;
@@ -106,8 +114,30 @@
         }
     }
 
+    function showTopToast(message = 'copy') {
+        let toast = document.getElementById('top-mini-toast');
+        if (!toast) {
+            toast = document.createElement('div');
+            toast.id = 'top-mini-toast';
+            toast.className = 'mini-toast';
+            document.body.appendChild(toast);
+        }
+
+        toast.textContent = message;
+        toast.classList.add('is-visible');
+
+        if (App.runtime.toastTimeoutId) {
+            clearTimeout(App.runtime.toastTimeoutId);
+        }
+
+        App.runtime.toastTimeoutId = setTimeout(() => {
+            toast.classList.remove('is-visible');
+        }, 900);
+    }
+
     fn.pushHistory = pushHistory;
     fn.undo = undo;
     fn.updateBatchIndicator = updateBatchIndicator;
     fn.initState = initState;
+    fn.showTopToast = showTopToast;
 })(window);

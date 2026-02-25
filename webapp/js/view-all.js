@@ -39,6 +39,21 @@
         return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
     }
 
+    function getBlockRepeatMeta(block) {
+        if (block.repeat_continuous) return { label: 'CONT', className: 'is-continuous' };
+        if (block.repeat_count) return { label: `x${block.repeat_count}`, className: 'is-count' };
+        if (block.repeat_duration_minutes) return { label: formatDurationMinutesToClock(block.repeat_duration_minutes), className: 'is-duration' };
+        return { label: 'ONCE', className: 'is-once' };
+    }
+
+    function hasContinuousFlowRisk(blocks, blockIdx) {
+        if (!blocks[blockIdx]?.repeat_continuous) return false;
+        for (let i = blockIdx + 1; i < blocks.length; i++) {
+            if (blocks[i]?.steps?.length) return true;
+        }
+        return false;
+    }
+
 function renderAllTimelinesModal() {
     const container = document.getElementById('all-timelines-container');
     if (!container) return;
@@ -79,11 +94,17 @@ function renderAllTimelinesModal() {
             // Block label
             const blockLabel = document.createElement('div');
             blockLabel.className = 'block-label';
-            let repeatInfo = '';
-            if (block.repeat_continuous) repeatInfo = ' • ∞';
-            else if (block.repeat_count) repeatInfo = ` • ${block.repeat_count}x`;
-            else if (block.repeat_duration_minutes) repeatInfo = ` • ${formatDurationMinutesToClock(block.repeat_duration_minutes)}`;
-            blockLabel.textContent = `${block.id || `Block ${blockIdx + 1}`}${repeatInfo}`;
+            const repeatMeta = getBlockRepeatMeta(block);
+            const flowRisk = hasContinuousFlowRisk(blocks, blockIdx);
+            blockLabel.innerHTML = `
+                <div class="block-label-content">
+                    <span class="block-title-text">${block.id || `Block ${blockIdx + 1}`}</span>
+                    <div class="block-badge-row">
+                        <span class="block-badge ${repeatMeta.className}">${repeatMeta.label}</span>
+                        ${flowRisk ? '<span class="block-badge is-warning">FLOW RISK</span>' : ''}
+                    </div>
+                </div>
+            `;
             blockGroup.appendChild(blockLabel);
 
             // Steps
@@ -129,13 +150,18 @@ function renderAllTimelinesModal() {
     // If no LEDs have programs, show message
     if (container.children.length === 0) {
         const emptyMsg = document.createElement('div');
-        emptyMsg.className = 'timeline-empty';
-        emptyMsg.textContent = 'No LED programs to display.';
-        emptyMsg.style.padding = '2rem';
-        emptyMsg.style.textAlign = 'center';
+        emptyMsg.className = 'timeline-empty-state';
+        emptyMsg.innerHTML = `
+            <i class="fas fa-inbox" aria-hidden="true"></i>
+            <div class="timeline-empty-copy">
+                <div class="timeline-empty-title">No LED programs yet</div>
+                <div class="timeline-empty-subtitle">Create steps in the editor to populate this overview.</div>
+            </div>
+        `;
         container.appendChild(emptyMsg);
     }
 }
 
     fn.renderAllTimelinesModal = renderAllTimelinesModal;
 })(window);
+

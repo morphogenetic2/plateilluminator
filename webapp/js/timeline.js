@@ -15,6 +15,271 @@
     function updateAllLedProgramIndicators() {
         return fn.updateAllLedProgramIndicators();
     }
+
+    function updateLedAppearances() {
+        return fn.updateLedAppearances ? fn.updateLedAppearances() : undefined;
+    }
+
+    function updateBatchIndicator() {
+        return fn.updateBatchIndicator ? fn.updateBatchIndicator() : undefined;
+    }
+
+    function showTopToast(message) {
+        return fn.showTopToast ? fn.showTopToast(message) : undefined;
+    }
+
+    function ensureBlockSelectionContext() {
+        if (State.blockSelectionLedIndex !== State.currentlyViewedLedIndex) {
+            State.selectedBlockIndices = new Set();
+            State.blockSelectionLedIndex = State.currentlyViewedLedIndex;
+        }
+    }
+
+    function getSortedSelectedBlockIndices() {
+        ensureBlockSelectionContext();
+        return [...State.selectedBlockIndices].sort((a, b) => a - b);
+    }
+
+    function setSelectedBlocks(indices) {
+        State.selectedBlockIndices = new Set(indices);
+        State.blockSelectionLedIndex = State.currentlyViewedLedIndex;
+    }
+
+    function clearSelectedBlocks() {
+        State.selectedBlockIndices = new Set();
+        State.blockSelectionLedIndex = State.currentlyViewedLedIndex;
+    }
+
+    function buildBlockPayload(blockIndices) {
+        if (State.currentlyViewedLedIndex === null) return null;
+        const ledData = State.programData[`LED${State.currentlyViewedLedIndex}`];
+        const blocks = ledData?.blocks || [];
+        const validIndices = blockIndices.filter(i => i >= 0 && i < blocks.length);
+        if (validIndices.length === 0) return null;
+
+        const payload = {
+            sourceLedIndex: State.currentlyViewedLedIndex,
+            blockIndices: [...validIndices],
+            blocks: validIndices.map(i => JSON.parse(JSON.stringify(blocks[i]))),
+        };
+        return payload;
+    }
+
+    function copySelectedBlocks() {
+        const selected = getSortedSelectedBlockIndices();
+        if (selected.length === 0) return false;
+
+        const payload = buildBlockPayload(selected);
+        if (!payload) return false;
+
+        State.blockClipboard = payload;
+        Runtime.blockDragPayload = payload;
+        State.lastCopyKind = 'block';
+        showTopToast('copy');
+        return true;
+    }
+
+    function getBlockClipboardPayload() {
+        if (!State.blockClipboard) return null;
+        return JSON.parse(JSON.stringify(State.blockClipboard));
+    }
+
+    function applyBlockPayloadToLed(ledIndex, payload = null) {
+        const sourcePayload = payload || Runtime.blockDragPayload || State.blockClipboard;
+        if (!sourcePayload?.blocks?.length) return false;
+
+        pushHistory();
+
+        const ledKey = `LED${ledIndex}`;
+        if (!State.programData[ledKey]) {
+            State.programData[ledKey] = { blocks: [] };
+        }
+        if (!Array.isArray(State.programData[ledKey].blocks)) {
+            State.programData[ledKey].blocks = [];
+        }
+
+        const targetBlocks = State.programData[ledKey].blocks;
+        const insertStart = targetBlocks.length;
+        const inserted = sourcePayload.blocks.map(block => JSON.parse(JSON.stringify(block)));
+        targetBlocks.push(...inserted);
+
+        State.selectedLedIndices = new Set([ledIndex]);
+        State.currentlyViewedLedIndex = ledIndex;
+        State.currentblockIndex = insertStart;
+        State.selectedBlockIndices = new Set(inserted.map((_, idx) => insertStart + idx));
+        State.blockSelectionLedIndex = ledIndex;
+        Runtime.blockDragPayload = JSON.parse(JSON.stringify(sourcePayload));
+        State.blockClipboard = JSON.parse(JSON.stringify(sourcePayload));
+
+        updateLedAppearances();
+        updateBatchIndicator();
+        updateAllLedProgramIndicators();
+        updateblockSelector();
+        renderTimeline();
+        return true;
+    }
+
+    function ensureBlockSelectionBox(timeline) {
+        if (!Runtime.blockSelectDrag) {
+            Runtime.blockSelectDrag = {
+                active: false,
+                hasMoved: false,
+                ignoreClick: false,
+                startX: 0,
+                startY: 0,
+                additive: false,
+                originSelection: new Set(),
+                boxEl: null,
+                bound: false,
+            };
+        }
+
+        if (Runtime.blockSelectDrag.boxEl && Runtime.blockSelectDrag.boxEl.parentElement !== timeline) {
+            Runtime.blockSelectDrag.boxEl = null;
+        }
+
+        if (!Runtime.blockSelectDrag.boxEl) {
+            const box = document.createElement('div');
+            box.className = 'block-drag-select-box';
+            timeline.appendChild(box);
+            Runtime.blockSelectDrag.boxEl = box;
+        }
+    }
+
+    function updateBlockSelectionByRect(timeline, rect) {
+        const drag = Runtime.blockSelectDrag;
+        const nextSelection = drag.additive ? new Set(drag.originSelection) : new Set();
+
+        timeline.querySelectorAll('.block-group').forEach(group => {
+            const groupRect = group.getBoundingClientRect();
+            const intersects =
+                rect.left <= groupRect.right &&
+                rect.right >= groupRect.left &&
+                rect.top <= groupRect.bottom &&
+                rect.bottom >= groupRect.top;
+
+            if (intersects) {
+                const idx = parseInt(group.dataset.blockIndex, 10);
+                nextSelection.add(idx);
+            }
+        });
+
+        setSelectedBlocks(nextSelection);
+        timeline.querySelectorAll('.block-group').forEach(group => {
+            const idx = parseInt(group.dataset.blockIndex, 10);
+            group.classList.toggle('multi-selected', State.selectedBlockIndices.has(idx));
+        });
+    }
+
+    function ensureTimelineBlockSelectionHandlers(timeline) {
+        ensureBlockSelectionBox(timeline);
+        const drag = Runtime.blockSelectDrag;
+        if (drag.bound) return;
+        drag.bound = true;
+
+        timeline.addEventListener('pointerdown', (e) => {
+            if (e.button !== 0) return;
+            if (!timeline.contains(e.target)) return;
+            if (e.target.closest('.block-label, .delete-block-btn, .step-pill, .delete-step, .timeline-empty-state, .timeline-empty-inline')) return;
+
+            ensureBlockSelectionBox(timeline);
+            drag.active = true;
+            drag.hasMoved = false;
+            drag.startX = e.clientX;
+            drag.startY = e.clientY;
+            drag.additive = e.ctrlKey || e.metaKey;
+            drag.originSelection = new Set(State.selectedBlockIndices);
+            if (drag.boxEl) drag.boxEl.style.display = 'none';
+        });
+
+        timeline.addEventListener('pointermove', (e) => {
+            if (!drag.active || !drag.boxEl) return;
+            const dx = e.clientX - drag.startX;
+            const dy = e.clientY - drag.startY;
+            if (!drag.hasMoved && Math.abs(dx) < 3 && Math.abs(dy) < 3) return;
+
+            drag.hasMoved = true;
+            const minX = Math.min(drag.startX, e.clientX);
+            const minY = Math.min(drag.startY, e.clientY);
+            const maxX = Math.max(drag.startX, e.clientX);
+            const maxY = Math.max(drag.startY, e.clientY);
+
+            const timelineRect = timeline.getBoundingClientRect();
+            drag.boxEl.style.left = `${minX - timelineRect.left}px`;
+            drag.boxEl.style.top = `${minY - timelineRect.top}px`;
+            drag.boxEl.style.width = `${maxX - minX}px`;
+            drag.boxEl.style.height = `${maxY - minY}px`;
+            drag.boxEl.style.display = 'block';
+
+            e.preventDefault();
+            updateBlockSelectionByRect(timeline, {
+                left: minX,
+                right: maxX,
+                top: minY,
+                bottom: maxY,
+            });
+        });
+
+        window.addEventListener('pointerup', () => {
+            if (!drag.active) return;
+            drag.active = false;
+            if (drag.boxEl) drag.boxEl.style.display = 'none';
+
+            if (drag.hasMoved) {
+                drag.ignoreClick = true;
+                setTimeout(() => {
+                    drag.ignoreClick = false;
+                }, 0);
+            }
+        });
+    }
+
+    function getBlockRepeatMeta(block) {
+        if (block.repeat_continuous) return { label: 'CONT', className: 'is-continuous' };
+        if (block.repeat_count) return { label: `x${block.repeat_count}`, className: 'is-count' };
+        if (block.repeat_duration_minutes) return { label: formatDurationMinutesToClock(block.repeat_duration_minutes), className: 'is-duration' };
+        return { label: 'ONCE', className: 'is-once' };
+    }
+
+    function hasContinuousFlowRisk(blocks, blockIdx) {
+        const current = blocks[blockIdx];
+        if (!current?.repeat_continuous) return false;
+        for (let i = blockIdx + 1; i < blocks.length; i++) {
+            if (blocks[i]?.steps?.length) return true;
+        }
+        return false;
+    }
+
+    function remapBlockIndexAfterMove(index, oldIndex, newIndex) {
+        if (index === oldIndex) return newIndex;
+        if (oldIndex < newIndex && index > oldIndex && index <= newIndex) return index - 1;
+        if (oldIndex > newIndex && index < oldIndex && index >= newIndex) return index + 1;
+        return index;
+    }
+
+    function renderTimelineEmptyState(timeline, iconClass, title, subtitle) {
+        timeline.innerHTML = `
+            <div class="timeline-empty-state">
+                <i class="${iconClass}" aria-hidden="true"></i>
+                <div class="timeline-empty-copy">
+                    <div class="timeline-empty-title">${title}</div>
+                    <div class="timeline-empty-subtitle">${subtitle}</div>
+                </div>
+            </div>
+        `;
+    }
+
+    function destroyTimelineSortables() {
+        if (Array.isArray(Runtime.timelineSortableInstances)) {
+            Runtime.timelineSortableInstances.forEach(instance => instance?.destroy?.());
+            Runtime.timelineSortableInstances = [];
+        }
+        if (Runtime.timelineSortableInstance) {
+            Runtime.timelineSortableInstance.destroy();
+            Runtime.timelineSortableInstance = null;
+        }
+    }
+
 function renderTimeline() {
     const timeline = document.getElementById('timeline-display');
     const timelineLabel = document.getElementById('timeline-label');
@@ -26,6 +291,7 @@ function renderTimeline() {
     if (fn.updateTotalDurationAvailability) fn.updateTotalDurationAvailability();
 
     timeline.innerHTML = '';
+    ensureBlockSelectionContext();
 
     // Update label with smart LED formatting
     if (timelineLabel) {
@@ -50,10 +316,7 @@ function renderTimeline() {
     }
 
     // Destroy previous sortable
-    if (Runtime.timelineSortableInstance) {
-        Runtime.timelineSortableInstance.destroy();
-        Runtime.timelineSortableInstance = null;
-    }
+    destroyTimelineSortables();
     if (Runtime.blockSortableInstance) {
         Runtime.blockSortableInstance.destroy();
         Runtime.blockSortableInstance = null;
@@ -61,7 +324,13 @@ function renderTimeline() {
 
     // Check state
     if (State.currentlyViewedLedIndex === null) {
-        timeline.innerHTML = '<span class="timeline-empty">Select LEDs to begin.</span>';
+        clearSelectedBlocks();
+        renderTimelineEmptyState(
+            timeline,
+            'fas fa-mouse-pointer',
+            'Select LEDs to start',
+            'Pick one or more LEDs to inspect and edit blocks.'
+        );
         return;
     }
 
@@ -69,9 +338,22 @@ function renderTimeline() {
     const blocks = ledData?.blocks || [];
 
     if (blocks.length === 0) {
-        timeline.innerHTML = '<span class="timeline-empty">No blocks. Click "+ Add block" to begin.</span>';
+        clearSelectedBlocks();
+        renderTimelineEmptyState(
+            timeline,
+            'fas fa-layer-group',
+            'No blocks yet',
+            'Use + Add block to create your first sequence.'
+        );
         return;
     }
+
+    State.currentblockIndex = Math.max(0, Math.min(State.currentblockIndex, blocks.length - 1));
+    const validSelected = getSortedSelectedBlockIndices().filter(idx => idx >= 0 && idx < blocks.length);
+    if (validSelected.length !== State.selectedBlockIndices.size) {
+        setSelectedBlocks(validSelected);
+    }
+    ensureTimelineBlockSelectionHandlers(timeline);
 
     // Render ALL blocks with visual grouping
     blocks.forEach((block, blockIdx) => {
@@ -79,16 +361,21 @@ function renderTimeline() {
         blockGroup.className = 'block-group';
         blockGroup.dataset.blockIndex = blockIdx;
         if (blockIdx === State.currentblockIndex) blockGroup.classList.add('active');
+        if (State.selectedBlockIndices.has(blockIdx)) blockGroup.classList.add('multi-selected');
 
         // block label
         const blockLabel = document.createElement('div');
         blockLabel.className = 'block-label';
-        let repeatInfo = '';
-        if (block.repeat_continuous) repeatInfo = ' • ∞';
-        else if (block.repeat_count) repeatInfo = ` • ${block.repeat_count}x`;
-        else if (block.repeat_duration_minutes) repeatInfo = ` • ${formatDurationMinutesToClock(block.repeat_duration_minutes)}`;
+        const repeatMeta = getBlockRepeatMeta(block);
+        const flowRisk = hasContinuousFlowRisk(blocks, blockIdx);
         blockLabel.innerHTML = `
-            <span>${block.id || `block ${blockIdx + 1}`}${repeatInfo}</span>
+            <div class="block-label-content">
+                <span class="block-title-text">${block.id || `block ${blockIdx + 1}`}</span>
+                <div class="block-badge-row">
+                    <span class="block-badge ${repeatMeta.className}">${repeatMeta.label}</span>
+                    ${flowRisk ? '<span class="block-badge is-warning">FLOW RISK</span>' : ''}
+                </div>
+            </div>
             <button class="delete-block-btn" data-block-index="${blockIdx}" title="Remove Block">
                 <i class="fas fa-times"></i>
             </button>
@@ -102,8 +389,8 @@ function renderTimeline() {
         const steps = block.steps || [];
         if (steps.length === 0) {
             const emptyMsg = document.createElement('span');
-            emptyMsg.className = 'timeline-empty';
-            emptyMsg.textContent = 'Empty block';
+            emptyMsg.className = 'timeline-empty-inline';
+            emptyMsg.textContent = 'No steps yet';
             stepsContainer.appendChild(emptyMsg);
         } else {
             steps.forEach((step, stepIdx) => {
@@ -115,7 +402,7 @@ function renderTimeline() {
                 let details = '';
                 if (step.type === 'ON') details = `${step.duration_ms}ms @ ${step.int}`;
                 else if (step.type === 'OFF') details = `${step.duration_ms}ms`;
-                else if (step.type === 'RAMP') details = `${step.duration_ms}ms: ${step.int0}→${step.int1}`;
+                else if (step.type === 'RAMP') details = `${step.duration_ms}ms: ${step.int0}->${step.int1}`;
                 else if (step.type === 'SINE') details = `${step.duration_ms}ms: ${step.freq}Hz`;
 
                 if (State.editingStepIndex === stepIdx && State.currentblockIndex === blockIdx) {
@@ -131,9 +418,12 @@ function renderTimeline() {
                 pill.addEventListener('click', (e) => {
                     if (!e.target.classList.contains('delete-step') && !e.target.closest('.delete-step')) {
                         // Step click should also focus its parent block.
+                        if (Runtime.blockSelectDrag?.ignoreClick) return;
                         State.currentblockIndex = blockIdx;
+                        setSelectedBlocks([blockIdx]);
                         updateblockSelector();
                         loadStepForEditing(stepIdx);
+                        renderTimeline();
                         e.stopPropagation();
                     }
                 });
@@ -147,11 +437,26 @@ function renderTimeline() {
 
         // Click handler to select block
         blockGroup.addEventListener('click', (e) => {
-            if (!e.target.classList.contains('delete-step') && !e.target.closest('.delete-step')) {
-                State.currentblockIndex = blockIdx;
-                updateblockSelector();
-                renderTimeline();
+            if (Runtime.blockSelectDrag?.ignoreClick) return;
+            if (
+                e.target.classList.contains('delete-step') ||
+                e.target.closest('.delete-step') ||
+                e.target.classList.contains('delete-block-btn') ||
+                e.target.closest('.delete-block-btn')
+            ) return;
+
+            State.currentblockIndex = blockIdx;
+            if (e.ctrlKey || e.metaKey) {
+                const next = new Set(State.selectedBlockIndices);
+                if (next.has(blockIdx)) next.delete(blockIdx);
+                else next.add(blockIdx);
+                setSelectedBlocks(next);
+            } else {
+                setSelectedBlocks([blockIdx]);
             }
+
+            updateblockSelector();
+            renderTimeline();
         });
     });
 
@@ -189,25 +494,54 @@ function renderTimeline() {
         });
     });
 
-    // Sortable only on current block
-    const currentblockStepsContainer = timeline.querySelector(`.block-steps[data-block-index="${State.currentblockIndex}"]`);
-    if (currentblockStepsContainer && blocks[State.currentblockIndex]?.steps?.length > 0) {
-        Runtime.timelineSortableInstance = Sortable.create(currentblockStepsContainer, {
+    // Sortable for STEPS in all blocks of the current LED (supports cross-block moves)
+    Runtime.timelineSortableInstances = [];
+    timeline.querySelectorAll('.block-steps').forEach(container => {
+        const sortable = Sortable.create(container, {
             animation: 150,
+            group: 'timeline-steps',
+            draggable: '.step-pill',
             filter: '.delete-step',
+            onStart: (evt) => {
+                const fromBlockIdx = parseInt(evt.from.dataset.blockIndex, 10);
+                if (!Number.isNaN(fromBlockIdx)) {
+                    State.currentblockIndex = fromBlockIdx;
+                    setSelectedBlocks([fromBlockIdx]);
+                    updateblockSelector();
+                }
+            },
             onEnd: (evt) => {
-                if (evt.oldIndex === evt.newIndex) return;
+                if (evt.oldIndex == null || evt.newIndex == null) return;
+
+                const fromBlockIdx = parseInt(evt.from.dataset.blockIndex, 10);
+                const toBlockIdx = parseInt(evt.to.dataset.blockIndex, 10);
+                if (Number.isNaN(fromBlockIdx) || Number.isNaN(toBlockIdx)) return;
+                if (fromBlockIdx === toBlockIdx && evt.oldIndex === evt.newIndex) return;
+
+                const fromSteps = blocks[fromBlockIdx]?.steps || [];
+                if (evt.oldIndex < 0 || evt.oldIndex >= fromSteps.length) return;
+
                 pushHistory();
-                const [moved] = blocks[State.currentblockIndex].steps.splice(evt.oldIndex, 1);
-                blocks[State.currentblockIndex].steps.splice(evt.newIndex, 0, moved);
+                const [movedStep] = fromSteps.splice(evt.oldIndex, 1);
+                const toSteps = blocks[toBlockIdx]?.steps || (blocks[toBlockIdx].steps = []);
+                const safeNewIndex = Math.max(0, Math.min(evt.newIndex, toSteps.length));
+                toSteps.splice(safeNewIndex, 0, movedStep);
+
+                State.currentblockIndex = toBlockIdx;
+                setSelectedBlocks([toBlockIdx]);
+                updateblockSelector();
+                renderTimeline();
             }
         });
-    }
+
+        Runtime.timelineSortableInstances.push(sortable);
+    });
 
     // Sortable for BLOCKS (NEW)
     if (blocks.length > 1) {
         Runtime.blockSortableInstance = Sortable.create(timeline, {
             animation: 150,
+            draggable: '.block-group',
             handle: '.block-label', // Drag by header only
             filter: '.delete-block-btn',
             onEnd: (evt) => {
@@ -215,36 +549,23 @@ function renderTimeline() {
 
                 pushHistory();
 
-                // Apply reorder to ALL selected LEDs
-                State.selectedLedIndices.forEach(ledIdx => {
-                    const targetLedData = State.programData[`LED${ledIdx}`];
-                    if (targetLedData?.blocks && targetLedData.blocks.length > evt.oldIndex) {
-                        // Ensure enough blocks exist to swap (basic safety)
-                        const [movedBlock] = targetLedData.blocks.splice(evt.oldIndex, 1);
-                        // Careful with index bounds if arrays differ, but assuming batch symmetry:
-                        targetLedData.blocks.splice(evt.newIndex, 0, movedBlock);
-                    }
-                });
+                const [movedBlock] = blocks.splice(evt.oldIndex, 1);
+                blocks.splice(evt.newIndex, 0, movedBlock);
 
-                // Update State.currentblockIndex if we moved the active block check
-                // If active block was at oldIndex, it's now at newIndex.
-                // If active was between old and new, it shifted.
-                // Simplest approach: Map the index. 
-                if (State.currentblockIndex === evt.oldIndex) {
-                    State.currentblockIndex = evt.newIndex;
-                } else if (State.currentblockIndex > evt.oldIndex && State.currentblockIndex <= evt.newIndex) {
-                    // Block moved from left to right, passing current. Current shifts left (-1).
-                    State.currentblockIndex--;
-                } else if (State.currentblockIndex < evt.oldIndex && State.currentblockIndex >= evt.newIndex) {
-                    // Block moved from right to left, passing current. Current shifts right (+1).
-                    State.currentblockIndex++;
+                State.currentblockIndex = remapBlockIndexAfterMove(
+                    State.currentblockIndex,
+                    evt.oldIndex,
+                    evt.newIndex
+                );
+                if (State.blockSelectionLedIndex === State.currentlyViewedLedIndex) {
+                    const remappedSelection = [...State.selectedBlockIndices].map(idx =>
+                        remapBlockIndexAfterMove(idx, evt.oldIndex, evt.newIndex)
+                    );
+                    setSelectedBlocks(remappedSelection);
                 }
 
                 // Re-render to ensure DOM indices match data
                 updateblockSelector();
-                // renderTimeline(); // Sortable moved DOM, but we want full refresh to be clean
-                // Actually, if we don't re-render, the data-index attributes on other blocks are WRONG.
-                // So we MUST re-render.
                 renderTimeline();
                 updateAllLedProgramIndicators();
             }
@@ -307,10 +628,8 @@ function updateblockSelector() {
 
     blocks.forEach((block, i) => {
         const opt = document.createElement('option');
-        let repeatInfo = '';
-        if (block.repeat_continuous) repeatInfo = ' (∞)';
-        else if (block.repeat_count) repeatInfo = ` (${block.repeat_count}x)`;
-        else if (block.repeat_duration_minutes) repeatInfo = ` (${formatDurationMinutesToClock(block.repeat_duration_minutes)})`;
+        const repeatMeta = getBlockRepeatMeta(block);
+        const repeatInfo = ` (${repeatMeta.label})`;
         opt.value = i;
         opt.textContent = `${block.id || `block ${i + 1}`}${repeatInfo}`;
         if (i === State.currentblockIndex) opt.selected = true;
@@ -468,6 +787,7 @@ function addblock() {
     if (State.currentlyViewedLedIndex !== null) {
         const ledData = State.programData[`LED${State.currentlyViewedLedIndex}`];
         State.currentblockIndex = ledData.blocks.length - 1;
+        setSelectedBlocks([State.currentblockIndex]);
     }
 
     updateblockSelector();
@@ -504,6 +824,8 @@ function removeblock(targetBlockIdx = null) {
         // If we removed a block *before* the current one, decrement index
         State.currentblockIndex--;
     }
+    if (blocksAfter.length > 0) setSelectedBlocks([State.currentblockIndex]);
+    else clearSelectedBlocks();
 
     updateblockSelector();
     renderTimeline();
@@ -519,4 +841,9 @@ function removeblock(targetBlockIdx = null) {
     fn.setBlockDurationPickerFromMinutes = setBlockDurationPickerFromMinutes;
     fn.syncBlockDurationPickerFromFields = syncBlockDurationPickerFromFields;
     fn.formatDurationMinutesToClock = formatDurationMinutesToClock;
+    fn.copySelectedBlocks = copySelectedBlocks;
+    fn.getBlockClipboardPayload = getBlockClipboardPayload;
+    fn.applyBlockPayloadToLed = applyBlockPayloadToLed;
+    fn.clearSelectedBlocks = clearSelectedBlocks;
 })(window);
+
