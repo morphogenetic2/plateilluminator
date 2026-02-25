@@ -190,9 +190,39 @@
 
                     <div class="control-group" id="repeat-duration-field" style="display: none;">
                         <span class="label-text">For</span>
-                        <input type="number" id="repeat-duration-input" class="compact-input" value="1" min="0"
-                            step="0.1">
-                        <span class="input-suffix">min</span>
+                        <div class="duration-dropdown" id="repeat-duration-picker">
+                            <button type="button" id="repeat-duration-trigger" class="duration-dropdown-trigger"
+                                aria-haspopup="true" aria-expanded="false">
+                                <span id="repeat-duration-display">00 : 01 : 00</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+
+                            <div id="repeat-duration-menu" class="duration-dropdown-menu">
+                                <div class="duration-grid">
+                                    <div class="duration-cell">
+                                        <label for="repeat-duration-hours">HH</label>
+                                        <input type="number" id="repeat-duration-hours" min="0" value="0">
+                                    </div>
+                                    <div class="duration-cell">
+                                        <label for="repeat-duration-minutes">MM</label>
+                                        <input type="number" id="repeat-duration-minutes" min="0" max="59" value="1">
+                                    </div>
+                                    <div class="duration-cell">
+                                        <label for="repeat-duration-seconds">SS</label>
+                                        <input type="number" id="repeat-duration-seconds" min="0" max="59" value="0">
+                                    </div>
+                                </div>
+                                <button type="button" id="repeat-duration-apply-btn" class="segment-btn"
+                                    style="justify-content: center;">
+                                    Apply
+                                </button>
+                            </div>
+                        </div>
+                        <input type="hidden" id="repeat-duration-input" value="1">
+                    </div>
+                    <div id="block-flow-warning" class="flow-warning-banner" style="display: none;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                        <span id="block-flow-warning-text">A continuous block will prevent the other blocks to run.</span>
                     </div>
                 </div>
             </main>
@@ -251,18 +281,35 @@
                     <input type="file" id="file-input" accept=".json" style="display: none;">
                 </div>
 
-                <div class="duration-display">
+                <div class="duration-display" id="total-duration-control">
                     <label>TOTAL DURATION</label>
-                    <div style="display: flex; align-items: center; gap: 4px;">
-                        <input type="number" id="run-time-hours" class="compact-input" value="0" min="0"
-                            style="width: 50px;">
-                        <span class="input-suffix">h</span>
-                        <input type="number" id="run-time-minutes" class="compact-input" value="0" min="0" max="59"
-                            style="width: 50px;">
-                        <span class="input-suffix">m</span>
-                        <input type="number" id="run-time-seconds" class="compact-input" value="0" min="0" max="59"
-                            style="width: 50px;">
-                        <span class="input-suffix">s</span>
+                    <div class="duration-dropdown duration-dropdown-wide duration-dropdown-up" id="run-time-picker">
+                        <button type="button" id="run-time-trigger" class="duration-dropdown-trigger"
+                            aria-haspopup="true" aria-expanded="false">
+                            <span id="run-time-display">00 : 00 : 00</span>
+                            <i class="fas fa-chevron-down"></i>
+                        </button>
+
+                        <div id="run-time-menu" class="duration-dropdown-menu">
+                            <div class="duration-grid">
+                                <div class="duration-cell">
+                                    <label for="run-time-hours">HH</label>
+                                    <input type="number" id="run-time-hours" min="0" value="0">
+                                </div>
+                                <div class="duration-cell">
+                                    <label for="run-time-minutes">MM</label>
+                                    <input type="number" id="run-time-minutes" min="0" max="59" value="0">
+                                </div>
+                                <div class="duration-cell">
+                                    <label for="run-time-seconds">SS</label>
+                                    <input type="number" id="run-time-seconds" min="0" max="59" value="0">
+                                </div>
+                            </div>
+                            <button type="button" id="run-time-apply-btn" class="segment-btn"
+                                style="justify-content: center;">
+                                Apply
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>

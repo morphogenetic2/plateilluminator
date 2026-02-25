@@ -14,6 +14,111 @@
     function renderTimeline() {
         return fn.renderTimeline();
     }
+
+    function padDurationValue(val) {
+        return `${Math.max(0, parseInt(val, 10) || 0)}`.padStart(2, '0');
+    }
+
+    function syncRunTimePickerFromFields() {
+        const hoursEl = document.getElementById('run-time-hours');
+        const minutesEl = document.getElementById('run-time-minutes');
+        const secondsEl = document.getElementById('run-time-seconds');
+        const displayEl = document.getElementById('run-time-display');
+        if (!hoursEl || !minutesEl || !secondsEl || !displayEl) return 0;
+
+        let hours = Math.max(0, parseInt(hoursEl.value, 10) || 0);
+        let minutes = Math.max(0, Math.min(59, parseInt(minutesEl.value, 10) || 0));
+        let seconds = Math.max(0, Math.min(59, parseInt(secondsEl.value, 10) || 0));
+
+        hoursEl.value = hours;
+        minutesEl.value = minutes;
+        secondsEl.value = seconds;
+        displayEl.textContent = `${padDurationValue(hours)} : ${padDurationValue(minutes)} : ${padDurationValue(seconds)}`;
+
+        return (hours * 3600) + (minutes * 60) + seconds;
+    }
+
+    function getBlockMode(block) {
+        if (block.repeat_continuous) return 'continuous';
+        if (block.repeat_count) return 'count';
+        if (block.repeat_duration_minutes !== null && block.repeat_duration_minutes !== undefined) return 'duration';
+        return 'once';
+    }
+
+    function getProgramFlowAnalysis() {
+        const analysis = {
+            hasContinuousBlocks: false,
+            hasNonContinuousBlocks: false,
+            hasContinuousBeforeOther: false,
+            warning: null,
+        };
+
+        for (const ledKey in State.programData) {
+            const blocks = State.programData[ledKey]?.blocks || [];
+
+            let seenContinuousInLed = false;
+            for (let idx = 0; idx < blocks.length; idx++) {
+                const block = blocks[idx];
+                const hasSteps = Array.isArray(block.steps) && block.steps.length > 0;
+                if (!hasSteps) continue;
+
+                const mode = getBlockMode(block);
+                if (mode === 'continuous') {
+                    analysis.hasContinuousBlocks = true;
+                    seenContinuousInLed = true;
+                    continue;
+                }
+
+                analysis.hasNonContinuousBlocks = true;
+                if (seenContinuousInLed && !analysis.hasContinuousBeforeOther) {
+                    analysis.hasContinuousBeforeOther = true;
+                    const ledNum = parseInt(ledKey.replace('LED', ''), 10) + 1;
+                    analysis.warning = `A continuous block will prevent the other blocks to run (LED ${ledNum}, block ${idx + 1} onward).`;
+                }
+            }
+        }
+
+        return analysis;
+    }
+
+    function updateTotalDurationAvailability() {
+        const analysis = getProgramFlowAnalysis();
+        const shouldEnable = analysis.hasContinuousBlocks && !analysis.hasNonContinuousBlocks;
+        const shouldLock = !shouldEnable;
+        const container = document.getElementById('total-duration-control');
+        const trigger = document.getElementById('run-time-trigger');
+        const menu = document.getElementById('run-time-menu');
+        const applyBtn = document.getElementById('run-time-apply-btn');
+        const warningEl = document.getElementById('block-flow-warning');
+        const warningTextEl = document.getElementById('block-flow-warning-text');
+        const fields = [
+            document.getElementById('run-time-hours'),
+            document.getElementById('run-time-minutes'),
+            document.getElementById('run-time-seconds'),
+        ].filter(Boolean);
+
+        if (container) container.classList.toggle('is-disabled', shouldLock);
+        if (trigger) {
+            trigger.disabled = shouldLock;
+            trigger.classList.remove('is-open');
+            trigger.setAttribute('aria-expanded', 'false');
+        }
+        if (menu) menu.classList.remove('is-open');
+        if (applyBtn) applyBtn.disabled = shouldLock;
+        fields.forEach(field => field.disabled = shouldLock);
+
+        if (shouldLock) {
+            fields.forEach(field => field.value = 0);
+            syncRunTimePickerFromFields();
+        }
+
+        if (warningEl) {
+            warningEl.style.display = analysis.hasContinuousBeforeOther ? 'flex' : 'none';
+        }
+        if (warningTextEl && analysis.hasContinuousBeforeOther) {
+            warningTextEl.textContent = analysis.warning || 'A continuous block will prevent the other blocks to run.';
+        }
+    }
 // Helper: Calculate total duration of a single LED's program in minutes
 function calculateLedProgramDuration(ledData) {
     if (!ledData?.blocks || ledData.blocks.length === 0) return 0;
@@ -66,10 +171,10 @@ function exportProgram() {
         return;
     }
 
-    const h = parseInt(document.getElementById('run-time-hours').value) || 0;
-    const m = parseInt(document.getElementById('run-time-minutes').value) || 0;
-    const s = parseInt(document.getElementById('run-time-seconds').value) || 0;
-    const totalSeconds = (h * 3600) + (m * 60) + s;
+    const totalSeconds = syncRunTimePickerFromFields();
+    const h = parseInt(document.getElementById('run-time-hours').value, 10) || 0;
+    const m = parseInt(document.getElementById('run-time-minutes').value, 10) || 0;
+    const s = parseInt(document.getElementById('run-time-seconds').value, 10) || 0;
 
     // Validation: Check if longest program exceeds total duration
     const longestProgramSeconds = findLongestProgramDuration();
@@ -91,6 +196,7 @@ function exportProgram() {
             document.getElementById('run-time-hours').value = longestHours;
             document.getElementById('run-time-minutes').value = longestMins;
             document.getElementById('run-time-seconds').value = longestSecs;
+            syncRunTimePickerFromFields();
 
             // Recalculate with new values
             const adjustedTotalS = (longestHours * 3600) + (longestMins * 60) + longestSecs;
@@ -156,10 +262,7 @@ async function saveToDevice() {
         return;
     }
 
-    const h = parseInt(document.getElementById('run-time-hours').value) || 0;
-    const m = parseInt(document.getElementById('run-time-minutes').value) || 0;
-    const s = parseInt(document.getElementById('run-time-seconds').value) || 0;
-    const totalSeconds = (h * 3600) + (m * 60) + s;
+    const totalSeconds = syncRunTimePickerFromFields();
 
     const exportData = getExportData(totalSeconds);
 
@@ -274,11 +377,13 @@ function loadProgram(event) {
             document.getElementById('run-time-hours').value = Math.floor(totalSeconds / 3600);
             document.getElementById('run-time-minutes').value = Math.floor((totalSeconds % 3600) / 60);
             document.getElementById('run-time-seconds').value = Math.floor(totalSeconds % 60);
+            syncRunTimePickerFromFields();
 
             State.currentblockIndex = 0;
             updateAllLedProgramIndicators();
             updateblockSelector();
             renderTimeline();
+            updateTotalDurationAvailability();
 
             alert('Loaded successfully!');
         } catch (err) {
@@ -296,4 +401,6 @@ function loadProgram(event) {
     fn.performExport = performExport;
     fn.saveToDevice = saveToDevice;
     fn.loadProgram = loadProgram;
+    fn.syncRunTimePickerFromFields = syncRunTimePickerFromFields;
+    fn.updateTotalDurationAvailability = updateTotalDurationAvailability;
 })(window);

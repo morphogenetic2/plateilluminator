@@ -18,7 +18,12 @@
 function renderTimeline() {
     const timeline = document.getElementById('timeline-display');
     const timelineLabel = document.getElementById('timeline-label');
-    if (!timeline) return;
+    if (!timeline) {
+        if (fn.updateTotalDurationAvailability) fn.updateTotalDurationAvailability();
+        return;
+    }
+
+    if (fn.updateTotalDurationAvailability) fn.updateTotalDurationAvailability();
 
     timeline.innerHTML = '';
 
@@ -81,7 +86,7 @@ function renderTimeline() {
         let repeatInfo = '';
         if (block.repeat_continuous) repeatInfo = ' • ∞';
         else if (block.repeat_count) repeatInfo = ` • ${block.repeat_count}x`;
-        else if (block.repeat_duration_minutes) repeatInfo = ` • ${block.repeat_duration_minutes}min`;
+        else if (block.repeat_duration_minutes) repeatInfo = ` • ${formatDurationMinutesToClock(block.repeat_duration_minutes)}`;
         blockLabel.innerHTML = `
             <span>${block.id || `block ${blockIdx + 1}`}${repeatInfo}</span>
             <button class="delete-block-btn" data-block-index="${blockIdx}" title="Remove Block">
@@ -125,6 +130,9 @@ function renderTimeline() {
 
                 pill.addEventListener('click', (e) => {
                     if (!e.target.classList.contains('delete-step') && !e.target.closest('.delete-step')) {
+                        // Step click should also focus its parent block.
+                        State.currentblockIndex = blockIdx;
+                        updateblockSelector();
                         loadStepForEditing(stepIdx);
                         e.stopPropagation();
                     }
@@ -302,7 +310,7 @@ function updateblockSelector() {
         let repeatInfo = '';
         if (block.repeat_continuous) repeatInfo = ' (∞)';
         else if (block.repeat_count) repeatInfo = ` (${block.repeat_count}x)`;
-        else if (block.repeat_duration_minutes) repeatInfo = ` (${block.repeat_duration_minutes}min)`;
+        else if (block.repeat_duration_minutes) repeatInfo = ` (${formatDurationMinutesToClock(block.repeat_duration_minutes)})`;
         opt.value = i;
         opt.textContent = `${block.id || `block ${i + 1}`}${repeatInfo}`;
         if (i === State.currentblockIndex) opt.selected = true;
@@ -311,6 +319,59 @@ function updateblockSelector() {
 
     // Update block config UI
     updateblockConfigUI();
+}
+
+function padDurationValue(val) {
+    return `${Math.max(0, parseInt(val, 10) || 0)}`.padStart(2, '0');
+}
+
+function formatDurationMinutesToClock(totalMinutes) {
+    const totalSeconds = Math.max(0, Math.round((parseFloat(totalMinutes) || 0) * 60));
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+    return `${padDurationValue(hours)}:${padDurationValue(minutes)}:${padDurationValue(seconds)}`;
+}
+
+function setBlockDurationPickerFromMinutes(totalMinutes) {
+    const hoursEl = document.getElementById('repeat-duration-hours');
+    const minutesEl = document.getElementById('repeat-duration-minutes');
+    const secondsEl = document.getElementById('repeat-duration-seconds');
+    const displayEl = document.getElementById('repeat-duration-display');
+    const hiddenEl = document.getElementById('repeat-duration-input');
+    if (!hoursEl || !minutesEl || !secondsEl || !displayEl || !hiddenEl) return;
+
+    const safeMinutes = Math.max(0, parseFloat(totalMinutes) || 0);
+    const totalSeconds = Math.round(safeMinutes * 60);
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const seconds = totalSeconds % 60;
+
+    hoursEl.value = hours;
+    minutesEl.value = minutes;
+    secondsEl.value = seconds;
+    hiddenEl.value = safeMinutes;
+
+    displayEl.textContent = `${padDurationValue(hours)} : ${padDurationValue(minutes)} : ${padDurationValue(seconds)}`;
+}
+
+function syncBlockDurationPickerFromFields() {
+    const hoursEl = document.getElementById('repeat-duration-hours');
+    const minutesEl = document.getElementById('repeat-duration-minutes');
+    const secondsEl = document.getElementById('repeat-duration-seconds');
+    if (!hoursEl || !minutesEl || !secondsEl) return 0;
+
+    let hours = Math.max(0, parseInt(hoursEl.value, 10) || 0);
+    let minutes = Math.max(0, Math.min(59, parseInt(minutesEl.value, 10) || 0));
+    let seconds = Math.max(0, Math.min(59, parseInt(secondsEl.value, 10) || 0));
+
+    hoursEl.value = hours;
+    minutesEl.value = minutes;
+    secondsEl.value = seconds;
+
+    const totalMinutes = (hours * 60) + minutes + (seconds / 60);
+    setBlockDurationPickerFromMinutes(totalMinutes);
+    return totalMinutes;
 }
 
 function updateblockConfigUI() {
@@ -340,7 +401,7 @@ function updateblockConfigUI() {
     if (mode === 'count') {
         document.getElementById('repeat-count-input').value = block.repeat_count || 10;
     } else if (mode === 'duration') {
-        document.getElementById('repeat-duration-input').value = block.repeat_duration_minutes || 1;
+        setBlockDurationPickerFromMinutes(block.repeat_duration_minutes ?? 1);
     }
 }
 
@@ -361,7 +422,7 @@ function saveblockConfig() {
     if (selectedMode === 'count') {
         repeat_count = Math.max(1, parseInt(document.getElementById('repeat-count-input').value) || 1);
     } else if (selectedMode === 'duration') {
-        repeat_duration_minutes = Math.max(0, parseFloat(document.getElementById('repeat-duration-input').value) || 1);
+        repeat_duration_minutes = syncBlockDurationPickerFromFields();
     } else if (selectedMode === 'continuous') {
         repeat_continuous = true;
     }
@@ -455,4 +516,7 @@ function removeblock(targetBlockIdx = null) {
     fn.saveblockConfig = saveblockConfig;
     fn.addblock = addblock;
     fn.removeblock = removeblock;
+    fn.setBlockDurationPickerFromMinutes = setBlockDurationPickerFromMinutes;
+    fn.syncBlockDurationPickerFromFields = syncBlockDurationPickerFromFields;
+    fn.formatDurationMinutesToClock = formatDurationMinutesToClock;
 })(window);

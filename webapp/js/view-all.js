@@ -2,6 +2,43 @@
     const App = global.App;
     const State = App.state;
     const fn = App.fn;
+
+    function focusEditorContext(ledIdx, blockIdx, stepIdx = null) {
+        State.selectedLedIndices.clear();
+        State.selectedLedIndices.add(ledIdx);
+        State.currentlyViewedLedIndex = ledIdx;
+        State.currentblockIndex = blockIdx;
+
+        if (stepIdx === null) {
+            State.editingStepIndex = null;
+            if (fn.updateEditButtonsUI) fn.updateEditButtonsUI();
+        }
+
+        fn.updateLedAppearances();
+        fn.updateblockSelector();
+        fn.updateBatchIndicator();
+        fn.renderTimeline();
+
+        const modal = document.getElementById('view-all-modal');
+        if (modal) modal.style.display = 'none';
+
+        if (stepIdx !== null && fn.loadStepForEditing) {
+            fn.loadStepForEditing(stepIdx);
+        }
+    }
+
+    function formatDurationMinutesToClock(totalMinutes) {
+        if (fn.formatDurationMinutesToClock) {
+            return fn.formatDurationMinutesToClock(totalMinutes);
+        }
+        const totalSeconds = Math.max(0, Math.round((parseFloat(totalMinutes) || 0) * 60));
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        const pad = (n) => `${n}`.padStart(2, '0');
+        return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+    }
+
 function renderAllTimelinesModal() {
     const container = document.getElementById('all-timelines-container');
     if (!container) return;
@@ -37,7 +74,7 @@ function renderAllTimelinesModal() {
 
             const blockGroup = document.createElement('div');
             blockGroup.className = 'block-group';
-            blockGroup.style.cursor = 'default'; // Read-only
+            blockGroup.style.cursor = 'pointer';
 
             // Block label
             const blockLabel = document.createElement('div');
@@ -45,7 +82,7 @@ function renderAllTimelinesModal() {
             let repeatInfo = '';
             if (block.repeat_continuous) repeatInfo = ' • ∞';
             else if (block.repeat_count) repeatInfo = ` • ${block.repeat_count}x`;
-            else if (block.repeat_duration_minutes) repeatInfo = ` • ${block.repeat_duration_minutes}min`;
+            else if (block.repeat_duration_minutes) repeatInfo = ` • ${formatDurationMinutesToClock(block.repeat_duration_minutes)}`;
             blockLabel.textContent = `${block.id || `Block ${blockIdx + 1}`}${repeatInfo}`;
             blockGroup.appendChild(blockLabel);
 
@@ -56,7 +93,7 @@ function renderAllTimelinesModal() {
             block.steps.forEach((step, stepIdx) => {
                 const pill = document.createElement('div');
                 pill.className = `step-pill type-${step.type.toLowerCase()}`;
-                pill.style.cursor = 'default'; // Read-only
+                pill.style.cursor = 'pointer';
 
                 let details = '';
                 if (step.type === 'ON') details = `${step.duration_ms}ms @ ${step.int}`;
@@ -69,7 +106,16 @@ function renderAllTimelinesModal() {
                     <span style="opacity:0.7; font-size:0.65rem;">${details}</span>
                 `;
 
+                pill.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    focusEditorContext(i, blockIdx, stepIdx);
+                });
+
                 stepsContainer.appendChild(pill);
+            });
+
+            blockGroup.addEventListener('click', () => {
+                focusEditorContext(i, blockIdx);
             });
 
             blockGroup.appendChild(stepsContainer);

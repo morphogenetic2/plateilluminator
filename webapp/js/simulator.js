@@ -213,6 +213,13 @@ const Simulator = {
         });
     },
 
+    getConfiguredTotalDurationS() {
+        const h = Math.max(0, parseInt(document.getElementById('run-time-hours')?.value, 10) || 0);
+        const m = Math.max(0, parseInt(document.getElementById('run-time-minutes')?.value, 10) || 0);
+        const s = Math.max(0, parseInt(document.getElementById('run-time-seconds')?.value, 10) || 0);
+        return (h * 3600) + (m * 60) + s;
+    },
+
     loop() {
         if (!this.isPlaying) return;
 
@@ -240,6 +247,12 @@ const Simulator = {
         });
 
         this.updateTimeDisplay();
+
+        const totalDurationS = this.getConfiguredTotalDurationS();
+        if (totalDurationS > 0 && this.currentTimeS >= totalDurationS) {
+            this.stop();
+            return;
+        }
 
         if (allDone) {
             this.stop();

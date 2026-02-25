@@ -22,6 +22,95 @@
     function saveToDevice() { return fn.saveToDevice(); }
     function undo() { return fn.undo(); }
     function renderAllTimelinesModal() { return fn.renderAllTimelinesModal(); }
+    function setBlockDurationPickerFromMinutes(totalMinutes) {
+        return fn.setBlockDurationPickerFromMinutes ? fn.setBlockDurationPickerFromMinutes(totalMinutes) : undefined;
+    }
+    function syncBlockDurationPickerFromFields() {
+        return fn.syncBlockDurationPickerFromFields ? fn.syncBlockDurationPickerFromFields() : 0;
+    }
+    function syncRunTimePickerFromFields() {
+        return fn.syncRunTimePickerFromFields ? fn.syncRunTimePickerFromFields() : 0;
+    }
+    function updateTotalDurationAvailability() {
+        return fn.updateTotalDurationAvailability ? fn.updateTotalDurationAvailability() : undefined;
+    }
+
+    function wireDurationDropdown(opts) {
+        const picker = document.getElementById(opts.pickerId);
+        const trigger = document.getElementById(opts.triggerId);
+        const menu = document.getElementById(opts.menuId);
+        const applyBtn = document.getElementById(opts.applyId);
+        const fields = opts.fieldIds.map(id => document.getElementById(id)).filter(Boolean);
+
+        if (!picker || !trigger || !menu || !applyBtn || fields.length === 0) return;
+
+        const setOpen = (isOpen) => {
+            if (trigger.disabled) return;
+            menu.classList.toggle('is-open', isOpen);
+            trigger.classList.toggle('is-open', isOpen);
+            trigger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        };
+
+        trigger.addEventListener('click', (e) => {
+            e.stopPropagation();
+            setOpen(!menu.classList.contains('is-open'));
+        });
+
+        applyBtn.addEventListener('click', () => {
+            opts.sync();
+            setOpen(false);
+            if (opts.onApply) opts.onApply();
+        });
+
+        const adjustFieldWithWheel = (field, delta, fastMode = false) => {
+            const minAttr = field.getAttribute('min');
+            const maxAttr = field.getAttribute('max');
+            const stepAttr = field.getAttribute('step');
+            const min = minAttr !== null ? parseInt(minAttr, 10) : null;
+            const max = maxAttr !== null ? parseInt(maxAttr, 10) : null;
+            const step = Math.max(1, parseInt(stepAttr, 10) || 1);
+            const multiplier = fastMode ? 10 : 1;
+            let next = (parseInt(field.value, 10) || 0) + (delta * step * multiplier);
+
+            if (min !== null) next = Math.max(min, next);
+            if (max !== null) next = Math.min(max, next);
+
+            field.value = next;
+        };
+
+        fields.forEach(field => {
+            field.addEventListener('input', () => {
+                opts.sync();
+            });
+            field.addEventListener('blur', () => {
+                opts.sync();
+                if (opts.onCommit) opts.onCommit();
+            });
+            field.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    opts.sync();
+                    setOpen(false);
+                    if (opts.onCommit) opts.onCommit();
+                }
+            });
+            field.addEventListener('wheel', (e) => {
+                if (field.disabled) return;
+                e.preventDefault();
+                e.stopPropagation();
+
+                const delta = e.deltaY < 0 ? 1 : -1;
+                adjustFieldWithWheel(field, delta, e.shiftKey);
+                opts.sync();
+            }, { passive: false });
+        });
+
+        document.addEventListener('click', (e) => {
+            if (!picker.contains(e.target)) {
+                setOpen(false);
+            }
+        });
+    }
+
 function initEventHandlers() {
     // Step type buttons
     document.querySelectorAll('.step-type-btn').forEach(btn => {
@@ -78,7 +167,28 @@ function initEventHandlers() {
     // block config
     document.getElementById('block-name-input')?.addEventListener('blur', saveblockConfig);
     document.getElementById('repeat-count-input')?.addEventListener('blur', saveblockConfig);
-    document.getElementById('repeat-duration-input')?.addEventListener('blur', saveblockConfig);
+    setBlockDurationPickerFromMinutes(1);
+    wireDurationDropdown({
+        pickerId: 'repeat-duration-picker',
+        triggerId: 'repeat-duration-trigger',
+        menuId: 'repeat-duration-menu',
+        applyId: 'repeat-duration-apply-btn',
+        fieldIds: ['repeat-duration-hours', 'repeat-duration-minutes', 'repeat-duration-seconds'],
+        sync: syncBlockDurationPickerFromFields,
+        onApply: saveblockConfig,
+        onCommit: saveblockConfig,
+    });
+
+    wireDurationDropdown({
+        pickerId: 'run-time-picker',
+        triggerId: 'run-time-trigger',
+        menuId: 'run-time-menu',
+        applyId: 'run-time-apply-btn',
+        fieldIds: ['run-time-hours', 'run-time-minutes', 'run-time-seconds'],
+        sync: syncRunTimePickerFromFields,
+    });
+    syncRunTimePickerFromFields();
+    updateTotalDurationAvailability();
 
     // Intensity Clamping
     ['on-int', 'ramp-int0', 'ramp-int1', 'sine-int0', 'sine-int1'].forEach(id => {
