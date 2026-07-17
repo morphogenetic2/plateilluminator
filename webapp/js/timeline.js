@@ -269,6 +269,21 @@
         `;
     }
 
+    function applyBlockSelectionClasses(timeline) {
+        if (!timeline) return;
+        timeline.querySelectorAll('.block-group').forEach(group => {
+            const idx = parseInt(group.dataset.blockIndex, 10);
+            group.classList.toggle('active', idx === State.currentblockIndex);
+            group.classList.toggle('multi-selected', State.selectedBlockIndices.has(idx));
+        });
+    }
+
+    function deferEnableTimelineClicks() {
+        setTimeout(() => {
+            Runtime.suppressTimelineClicks = false;
+        }, 0);
+    }
+
     function destroyTimelineSortables() {
         if (Array.isArray(Runtime.timelineSortableInstances)) {
             Runtime.timelineSortableInstances.forEach(instance => instance?.destroy?.());
@@ -316,11 +331,14 @@
         }
 
         // Destroy previous sortable
-        destroyTimelineSortables();
-        if (Runtime.blockSortableInstance) {
-            Runtime.blockSortableInstance.destroy();
-            Runtime.blockSortableInstance = null;
-        }
+    destroyTimelineSortables();
+    if (Runtime.blockSortableInstance) {
+        Runtime.blockSortableInstance.destroy();
+        Runtime.blockSortableInstance = null;
+    }
+    Runtime.isBlockDragActive = false;
+    Runtime.isStepDragActive = false;
+    Runtime.suppressTimelineClicks = false;
 
         // Check state
         if (State.currentlyViewedLedIndex === null) {
@@ -415,15 +433,20 @@
                     <button class="delete-step" data-block-index="${blockIdx}" data-step-index="${stepIdx}" title="Remove"><i class="fas fa-times"></i></button>
                 `;
 
-                    pill.addEventListener('click', (e) => {
-                        if (!e.target.classList.contains('delete-step') && !e.target.closest('.delete-step')) {
-                            // Step click should also focus its parent block.
-                            if (Runtime.blockSelectDrag?.ignoreClick) return;
-                            State.currentblockIndex = blockIdx;
-                            setSelectedBlocks([blockIdx]);
-                            updateblockSelector();
-                            loadStepForEditing(stepIdx);
-                            renderTimeline();
+                pill.addEventListener('click', (e) => {
+                    if (!e.target.classList.contains('delete-step') && !e.target.closest('.delete-step')) {
+                        // Step click should also focus its parent block.
+                        if (
+                            Runtime.blockSelectDrag?.ignoreClick ||
+                            Runtime.suppressTimelineClicks ||
+                            Runtime.isBlockDragActive ||
+                            Runtime.isStepDragActive
+                        ) return;
+                        State.currentblockIndex = blockIdx;
+                        setSelectedBlocks([blockIdx]);
+                        updateblockSelector();
+                        loadStepForEditing(stepIdx);
+                        renderTimeline();
                             e.stopPropagation();
                         }
                     });
@@ -436,13 +459,18 @@
             timeline.appendChild(blockGroup);
 
             // Click handler to select block
-            blockGroup.addEventListener('click', (e) => {
-                if (Runtime.blockSelectDrag?.ignoreClick) return;
-                if (
-                    e.target.classList.contains('delete-step') ||
-                    e.target.closest('.delete-step') ||
-                    e.target.classList.contains('delete-block-btn') ||
-                    e.target.closest('.delete-block-btn')
+        blockGroup.addEventListener('click', (e) => {
+            if (
+                Runtime.blockSelectDrag?.ignoreClick ||
+                Runtime.suppressTimelineClicks ||
+                Runtime.isBlockDragActive ||
+                Runtime.isStepDragActive
+            ) return;
+            if (
+                e.target.classList.contains('delete-step') ||
+                e.target.closest('.delete-step') ||
+                e.target.classList.contains('delete-block-btn') ||
+                e.target.closest('.delete-block-btn')
                 ) return;
 
                 State.currentblockIndex = blockIdx;
@@ -453,11 +481,11 @@
                     setSelectedBlocks(next);
                 } else {
                     setSelectedBlocks([blockIdx]);
-                }
+            }
 
-                updateblockSelector();
-                renderTimeline();
-            });
+            updateblockSelector();
+            applyBlockSelectionClasses(timeline);
+        });
         });
 
         // Delete handlers
@@ -495,22 +523,28 @@
         });
 
         // Sortable for STEPS in all blocks of the current LED (supports cross-block moves)
-        Runtime.timelineSortableInstances = [];
-        timeline.querySelectorAll('.block-steps').forEach(container => {
-            const sortable = Sortable.create(container, {
-                animation: 150,
-                group: 'timeline-steps',
-                draggable: '.step-pill',
-                filter: '.delete-step',
-                onStart: (evt) => {
-                    const fromBlockIdx = parseInt(evt.from.dataset.blockIndex, 10);
-                    if (!Number.isNaN(fromBlockIdx)) {
-                        State.currentblockIndex = fromBlockIdx;
-                        setSelectedBlocks([fromBlockIdx]);
-                        updateblockSelector();
-                    }
-                },
-                onEnd: (evt) => {
+    Runtime.timelineSortableInstances = [];
+    timeline.querySelectorAll('.block-steps').forEach(container => {
+        const sortable = Sortable.create(container, {
+            animation: 150,
+            group: 'timeline-steps',
+            draggable: '.step-pill',
+            filter: '.delete-step',
+            forceFallback: true,
+            fallbackOnBody: true,
+            fallbackTolerance: 3,
+            onStart: (evt) => {
+                Runtime.isStepDragActive = true;
+                Runtime.suppressTimelineClicks = true;
+                const fromBlockIdx = parseInt(evt.from.dataset.blockIndex, 10);
+                if (!Number.isNaN(fromBlockIdx)) {
+                    State.currentblockIndex = fromBlockIdx;
+                    setSelectedBlocks([fromBlockIdx]);
+                    updateblockSelector();
+                }
+            },
+            onEnd: (evt) => {
+                try {
                     if (evt.oldIndex == null || evt.newIndex == null) return;
 
                     const fromBlockIdx = parseInt(evt.from.dataset.blockIndex, 10);
@@ -531,20 +565,37 @@
                     setSelectedBlocks([toBlockIdx]);
                     updateblockSelector();
                     renderTimeline();
+                } finally {
+                    Runtime.isStepDragActive = false;
+                    deferEnableTimelineClicks();
                 }
-            });
+            },
+            onUnchoose: () => {
+                Runtime.isStepDragActive = false;
+                deferEnableTimelineClicks();
+            }
+        });
 
             Runtime.timelineSortableInstances.push(sortable);
         });
 
         // Sortable for BLOCKS (NEW)
-        if (blocks.length > 1) {
-            Runtime.blockSortableInstance = Sortable.create(timeline, {
-                animation: 150,
-                draggable: '.block-group',
-                handle: '.block-label', // Drag by header only
-                filter: '.delete-block-btn',
-                onEnd: (evt) => {
+    if (blocks.length > 1) {
+        Runtime.blockSortableInstance = Sortable.create(timeline, {
+            animation: 150,
+            draggable: '.block-group',
+            handle: '.block-label', // Drag by header only
+            filter: '.delete-block-btn',
+            forceFallback: true,
+            fallbackOnBody: true,
+            fallbackTolerance: 3,
+            onStart: () => {
+                Runtime.isBlockDragActive = true;
+                Runtime.suppressTimelineClicks = true;
+            },
+            onEnd: (evt) => {
+                try {
+                    if (evt.oldIndex == null || evt.newIndex == null) return;
                     if (evt.oldIndex === evt.newIndex) return;
 
                     pushHistory();
@@ -568,9 +619,17 @@
                     updateblockSelector();
                     renderTimeline();
                     updateAllLedProgramIndicators();
+                } finally {
+                    Runtime.isBlockDragActive = false;
+                    deferEnableTimelineClicks();
                 }
-            });
-        }
+            },
+            onUnchoose: () => {
+                Runtime.isBlockDragActive = false;
+                deferEnableTimelineClicks();
+            }
+        });
+    }
     }
 
     // ==========================================

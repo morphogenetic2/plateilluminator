@@ -47,6 +47,9 @@
         blockSelectDrag: null,
         blockDragPayload: null,
         toastTimeoutId: null,
+        isBlockDragActive: false,
+        isStepDragActive: false,
+        suppressTimelineClicks: false,
     });
 
     const State = App.state;
