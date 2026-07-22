@@ -3,6 +3,24 @@
     const State = App.state;
     const fn = App.fn;
 
+    function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, char => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;',
+        })[char]);
+    }
+
+    function activateOnKeyboard(element) {
+        element.addEventListener('keydown', event => {
+            if (event.target !== element || (event.key !== 'Enter' && event.key !== ' ')) return;
+            event.preventDefault();
+            element.click();
+        });
+    }
+
     function focusEditorContext(ledIdx, blockIdx, stepIdx = null) {
         State.selectedLedIndices.clear();
         State.selectedLedIndices.add(ledIdx);
@@ -20,7 +38,7 @@
         fn.renderTimeline();
 
         const modal = document.getElementById('view-all-modal');
-        if (modal) modal.style.display = 'none';
+        if (modal && fn.closeViewAllModal) fn.closeViewAllModal();
 
         if (stepIdx !== null && fn.loadStepForEditing) {
             fn.loadStepForEditing(stepIdx);
@@ -90,6 +108,10 @@ function renderAllTimelinesModal() {
             const blockGroup = document.createElement('div');
             blockGroup.className = 'block-group';
             blockGroup.style.cursor = 'pointer';
+            blockGroup.tabIndex = 0;
+            blockGroup.setAttribute('role', 'button');
+            blockGroup.setAttribute('aria-label', `Open ${block.id || `Block ${blockIdx + 1}`} for LED ${i + 1}`);
+            activateOnKeyboard(blockGroup);
 
             // Block label
             const blockLabel = document.createElement('div');
@@ -98,7 +120,7 @@ function renderAllTimelinesModal() {
             const flowRisk = hasContinuousFlowRisk(blocks, blockIdx);
             blockLabel.innerHTML = `
                 <div class="block-label-content">
-                    <span class="block-title-text">${block.id || `Block ${blockIdx + 1}`}</span>
+                    <span class="block-title-text">${escapeHtml(block.id || `Block ${blockIdx + 1}`)}</span>
                     <div class="block-badge-row">
                         <span class="block-badge ${repeatMeta.className}">${repeatMeta.label}</span>
                         ${flowRisk ? '<span class="block-badge is-warning">FLOW RISK</span>' : ''}
@@ -113,8 +135,13 @@ function renderAllTimelinesModal() {
 
             block.steps.forEach((step, stepIdx) => {
                 const pill = document.createElement('div');
-                pill.className = `step-pill type-${step.type.toLowerCase()}`;
+                const safeStepType = ['ON', 'OFF', 'RAMP', 'SINE'].includes(step.type) ? step.type : 'OFF';
+                pill.className = `step-pill type-${safeStepType.toLowerCase()}`;
                 pill.style.cursor = 'pointer';
+                pill.tabIndex = 0;
+                pill.setAttribute('role', 'button');
+                pill.setAttribute('aria-label', `Edit ${safeStepType} step ${stepIdx + 1} for LED ${i + 1}`);
+                activateOnKeyboard(pill);
 
                 let details = '';
                 if (step.type === 'ON') details = `${step.duration_ms}ms @ ${step.int}`;
@@ -123,8 +150,8 @@ function renderAllTimelinesModal() {
                 else if (step.type === 'SINE') details = `${step.duration_ms}ms: ${step.freq}Hz`;
 
                 pill.innerHTML = `
-                    <span>${step.type}</span>
-                    <span style="opacity:0.7; font-size:0.65rem;">${details}</span>
+                    <span>${escapeHtml(safeStepType)}</span>
+                    <span class="step-details">${escapeHtml(details)}</span>
                 `;
 
                 pill.addEventListener('click', (e) => {
@@ -164,4 +191,3 @@ function renderAllTimelinesModal() {
 
     fn.renderAllTimelinesModal = renderAllTimelinesModal;
 })(window);
-

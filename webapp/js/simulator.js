@@ -148,7 +148,9 @@ const Simulator = {
 
         this.isPlaying = true;
         this.lastFrameTime = performance.now();
-        document.getElementById('sim-play-btn').innerHTML = '<i class="fas fa-pause"></i>';
+        const playButton = document.getElementById('sim-play-btn');
+        playButton.innerHTML = '<i class="fas fa-pause" aria-hidden="true"></i>';
+        playButton.setAttribute('aria-label', 'Pause Simulation');
         document.body.classList.add('simulating');
         this.loop();
     },
@@ -180,7 +182,9 @@ const Simulator = {
     pause() {
         this.isPlaying = false;
         cancelAnimationFrame(this.rafId);
-        document.getElementById('sim-play-btn').innerHTML = '<i class="fas fa-play"></i>';
+        const playButton = document.getElementById('sim-play-btn');
+        playButton.innerHTML = '<i class="fas fa-play" aria-hidden="true"></i>';
+        playButton.setAttribute('aria-label', 'Play Simulation');
     },
 
     stop() {
@@ -209,7 +213,9 @@ const Simulator = {
     setSpeed(val) {
         this.speed = val;
         document.querySelectorAll('.sim-speed-btn').forEach(b => {
-            b.classList.toggle('is-selected', parseInt(b.dataset.speed) === val);
+            const isSelected = parseInt(b.dataset.speed) === val;
+            b.classList.toggle('is-selected', isSelected);
+            b.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
         });
     },
 

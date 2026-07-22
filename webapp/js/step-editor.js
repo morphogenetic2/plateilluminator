@@ -14,6 +14,12 @@
     function updateAllLedProgramIndicators() {
         return fn.updateAllLedProgramIndicators();
     }
+    function showTopToast(message) {
+        return fn.showTopToast ? fn.showTopToast(message) : undefined;
+    }
+    function updateblockSelector() {
+        return fn.updateblockSelector ? fn.updateblockSelector() : undefined;
+    }
 function updateStepParams() {
     document.querySelectorAll('.step-params').forEach(el => el.classList.remove('active'));
     const type = State.currentStepType.toLowerCase();
@@ -26,7 +32,7 @@ function updateStepParams() {
 
 function addStep() {
     if (State.selectedLedIndices.size === 0) {
-        alert('Select LEDs first.');
+        showTopToast('Select at least 1 LED first');
         return;
     }
 
@@ -59,13 +65,14 @@ function addStep() {
 
     renderTimeline();
     updateAllLedProgramIndicators();
+    updateblockSelector();
 }
 
 function validateSelection() {
     for (const idx of State.selectedLedIndices) {
         const ledData = State.programData[`LED${idx}`];
         if (!ledData.blocks || ledData.blocks.length === 0) {
-            alert(`LED ${idx + 1} has no blocks. Add a block first.`);
+            showTopToast(`LED ${idx + 1} needs a block first`);
             return false;
         }
     }
@@ -86,7 +93,11 @@ function loadStepForEditing(stepIdx) {
     // Select Type Button
     document.querySelectorAll('.step-type-btn').forEach(b => {
         b.classList.remove('is-selected');
-        if (b.dataset.value === step.type) b.classList.add('is-selected');
+        b.setAttribute('aria-pressed', 'false');
+        if (b.dataset.value === step.type) {
+            b.classList.add('is-selected');
+            b.setAttribute('aria-pressed', 'true');
+        }
     });
 
     // Populate Common
@@ -139,12 +150,19 @@ function updateStep() {
     cancelStepEdit(); // Clear mode
     renderTimeline();
     updateAllLedProgramIndicators();
+    updateblockSelector();
 }
 
 function buildStepObject() {
-    const duration = parseInt(document.getElementById('step-duration').value) || 1000;
+    const durationInput = document.getElementById('step-duration');
+    const error = document.getElementById('step-error');
+    const duration = parseInt(durationInput.value) || 1000;
+    durationInput.removeAttribute('aria-invalid');
+    if (error) error.textContent = '';
     if (duration < 50) {
-        alert('Duration must be >= 50ms');
+        durationInput.setAttribute('aria-invalid', 'true');
+        if (error) error.textContent = 'Duration must be at least 50 ms.';
+        durationInput.focus();
         return null;
     }
 

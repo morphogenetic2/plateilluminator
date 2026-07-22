@@ -1,6 +1,7 @@
 (function initEventsModule(global) {
     const App = global.App;
     const State = App.state;
+    const Runtime = App.runtime;
     const fn = App.fn;
 
     function updateStepParams() { return fn.updateStepParams(); }
@@ -45,6 +46,43 @@
     }
     function showTopToast(message) {
         return fn.showTopToast ? fn.showTopToast(message) : undefined;
+    }
+    function markDirty() {
+        return fn.markDirty ? fn.markDirty() : undefined;
+    }
+
+    function isEditableTarget(target) {
+        return Boolean(target?.closest?.('input, textarea, select, [contenteditable="true"]'));
+    }
+
+    function getModalFocusableElements(modal) {
+        return [...modal.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])')]
+            .filter(element => !element.hidden && element.offsetParent !== null);
+    }
+
+    function openViewAllModal() {
+        const modal = document.getElementById('view-all-modal');
+        if (!modal) return;
+        Runtime.modalTrigger = document.activeElement;
+        renderAllTimelinesModal();
+        modal.style.display = 'flex';
+        modal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('modal-open');
+        document.querySelector('.app-header')?.setAttribute('inert', '');
+        document.querySelector('.workspace')?.setAttribute('inert', '');
+        requestAnimationFrame(() => document.getElementById('close-view-all-btn')?.focus());
+    }
+
+    function closeViewAllModal() {
+        const modal = document.getElementById('view-all-modal');
+        if (!modal || modal.style.display === 'none') return;
+        modal.style.display = 'none';
+        modal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('modal-open');
+        document.querySelector('.app-header')?.removeAttribute('inert');
+        document.querySelector('.workspace')?.removeAttribute('inert');
+        Runtime.modalTrigger?.focus?.();
+        Runtime.modalTrigger = null;
     }
 
     function wireDurationDropdown(opts) {
@@ -127,8 +165,12 @@ function initEventHandlers() {
     // Step type buttons
     document.querySelectorAll('.step-type-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('.step-type-btn').forEach(b => b.classList.remove('is-selected'));
+            document.querySelectorAll('.step-type-btn').forEach(b => {
+                b.classList.remove('is-selected');
+                b.setAttribute('aria-pressed', 'false');
+            });
             btn.classList.add('is-selected');
+            btn.setAttribute('aria-pressed', 'true');
             State.currentStepType = btn.dataset.value;
             updateStepParams();
         });
@@ -152,10 +194,12 @@ function initEventHandlers() {
 
     document.getElementById('clear-selected-btn')?.addEventListener('click', () => {
         if (State.selectedLedIndices.size === 0) {
-            alert('Select LEDs first.');
+            showTopToast('Select at least 1 LED first');
             return;
         }
         if (!confirm(`Clear all data for ${State.selectedLedIndices.size} LEDs?`)) return;
+
+        pushHistory();
 
         State.selectedLedIndices.forEach(idx => {
             State.programData[`LED${idx}`] = { blocks: [] };
@@ -198,6 +242,8 @@ function initEventHandlers() {
         applyId: 'run-time-apply-btn',
         fieldIds: ['run-time-hours', 'run-time-minutes', 'run-time-seconds'],
         sync: syncRunTimePickerFromFields,
+        onApply: markDirty,
+        onCommit: markDirty,
     });
     syncRunTimePickerFromFields();
     updateTotalDurationAvailability();
@@ -214,8 +260,12 @@ function initEventHandlers() {
 
     document.querySelectorAll('.repeat-mode-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('.repeat-mode-btn').forEach(b => b.classList.remove('is-selected'));
+            document.querySelectorAll('.repeat-mode-btn').forEach(b => {
+                b.classList.remove('is-selected');
+                b.setAttribute('aria-pressed', 'false');
+            });
             btn.classList.add('is-selected');
+            btn.setAttribute('aria-pressed', 'true');
 
             const mode = btn.dataset.mode;
             document.getElementById('repeat-count-field').style.display = mode === 'count' ? 'flex' : 'none';
@@ -244,6 +294,8 @@ function initEventHandlers() {
     // Undo
     document.getElementById('undo-btn')?.addEventListener('click', undo);
     document.addEventListener('keydown', (e) => {
+        if (isEditableTarget(e.target)) return;
+
         // Ctrl+Z: Undo
         if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
             e.preventDefault();
@@ -373,23 +425,42 @@ function initEventHandlers() {
     });
 
     // View All Modal
-    document.getElementById('view-all-btn')?.addEventListener('click', () => {
-        renderAllTimelinesModal();
-        document.getElementById('view-all-modal').style.display = 'flex';
-    });
+    document.getElementById('view-all-btn')?.addEventListener('click', openViewAllModal);
 
-    document.getElementById('close-view-all-btn')?.addEventListener('click', () => {
-        document.getElementById('view-all-modal').style.display = 'none';
-    });
+    document.getElementById('close-view-all-btn')?.addEventListener('click', closeViewAllModal);
 
     // Close modal on background click
     document.getElementById('view-all-modal')?.addEventListener('click', (e) => {
         if (e.target.id === 'view-all-modal') {
-            document.getElementById('view-all-modal').style.display = 'none';
+            closeViewAllModal();
+        }
+    });
+
+    document.getElementById('view-all-modal')?.addEventListener('keydown', (event) => {
+        const modal = event.currentTarget;
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closeViewAllModal();
+            return;
+        }
+        if (event.key !== 'Tab') return;
+
+        const focusable = getModalFocusableElements(modal);
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
         }
     });
 }
 
 
     fn.initEventHandlers = initEventHandlers;
+    fn.openViewAllModal = openViewAllModal;
+    fn.closeViewAllModal = closeViewAllModal;
 })(window);

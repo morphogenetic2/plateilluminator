@@ -157,13 +157,19 @@ function initLedGrid() {
 
     for (let i = 0; i < App.config.NUM_LEDS; i++) {
         const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.id = `led-btn-${i}`;
         btn.className = 'led-btn';
         btn.dataset.ledId = i;
         btn.textContent = i + 1;
+        btn.setAttribute('aria-label', `LED ${i + 1}`);
+        btn.setAttribute('aria-pressed', 'false');
+        btn.tabIndex = i === 0 ? 0 : -1;
 
         btn.addEventListener('click', (e) => {
             handleLedClick(i, e);
         });
+        btn.addEventListener('keydown', handleLedGridKeydown);
 
         grid.appendChild(btn);
         Runtime.allLedButtons.push(btn);
@@ -174,6 +180,25 @@ function initLedGrid() {
     grid.addEventListener('pointerdown', onGridPointerDown);
     grid.addEventListener('pointermove', onGridPointerMove);
     window.addEventListener('pointerup', onGridPointerUp);
+}
+
+function handleLedGridKeydown(event) {
+    const currentIndex = parseInt(event.currentTarget.dataset.ledId, 10);
+    let nextIndex = currentIndex;
+
+    if (event.key === 'ArrowRight') nextIndex = Math.min(App.config.NUM_LEDS - 1, currentIndex + 1);
+    else if (event.key === 'ArrowLeft') nextIndex = Math.max(0, currentIndex - 1);
+    else if (event.key === 'ArrowDown') nextIndex = Math.min(App.config.NUM_LEDS - 1, currentIndex + 6);
+    else if (event.key === 'ArrowUp') nextIndex = Math.max(0, currentIndex - 6);
+    else if (event.key === 'Home') nextIndex = 0;
+    else if (event.key === 'End') nextIndex = App.config.NUM_LEDS - 1;
+    else return;
+
+    event.preventDefault();
+    Runtime.allLedButtons.forEach((button, index) => {
+        button.tabIndex = index === nextIndex ? 0 : -1;
+    });
+    Runtime.allLedButtons[nextIndex]?.focus();
 }
 
 function handleLedClick(ledIndex, event) {
@@ -213,6 +238,10 @@ function handleLedClick(ledIndex, event) {
     State.currentlyViewedLedIndex = ledIndex;
     State.currentblockIndex = 0;
 
+    Runtime.allLedButtons.forEach((button, index) => {
+        button.tabIndex = index === ledIndex ? 0 : -1;
+    });
+
     updateLedAppearances();
     updateblockSelector();
     updateBatchIndicator();
@@ -226,7 +255,13 @@ function updateLedAppearances() {
 
         if (id === State.currentlyViewedLedIndex) btn.classList.add('viewing');
         else if (State.selectedLedIndices.has(id)) btn.classList.add('selected');
+
+        const isSelected = State.selectedLedIndices.has(id);
+        btn.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
+        if (id === State.currentlyViewedLedIndex) btn.setAttribute('aria-current', 'true');
+        else btn.removeAttribute('aria-current');
     });
+    if (fn.updateEditorAvailability) fn.updateEditorAvailability();
 }
 
 function updateAllLedProgramIndicators() {
@@ -246,6 +281,7 @@ function updateAllLedProgramIndicators() {
         }
 
         btn.classList.toggle('has-program', hasProgram);
+        btn.setAttribute('aria-label', `LED ${idx + 1}${hasProgram ? ', has program' : ''}`);
     });
 }
 

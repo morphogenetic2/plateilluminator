@@ -28,6 +28,25 @@
         return fn.showTopToast ? fn.showTopToast(message) : undefined;
     }
 
+    function escapeHtml(value) {
+        return String(value).replace(/[&<>"']/g, char => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;',
+        })[char]);
+    }
+
+    function activateOnKeyboard(element) {
+        element.addEventListener('keydown', event => {
+            if (event.target !== element) return;
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            event.preventDefault();
+            element.click();
+        });
+    }
+
     function ensureBlockSelectionContext() {
         if (State.blockSelectionLedIndex !== State.currentlyViewedLedIndex) {
             State.selectedBlockIndices = new Set();
@@ -167,7 +186,9 @@
         setSelectedBlocks(nextSelection);
         timeline.querySelectorAll('.block-group').forEach(group => {
             const idx = parseInt(group.dataset.blockIndex, 10);
-            group.classList.toggle('multi-selected', State.selectedBlockIndices.has(idx));
+            const isSelected = State.selectedBlockIndices.has(idx);
+            group.classList.toggle('multi-selected', isSelected);
+            group.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
         });
     }
 
@@ -274,7 +295,9 @@
         timeline.querySelectorAll('.block-group').forEach(group => {
             const idx = parseInt(group.dataset.blockIndex, 10);
             group.classList.toggle('active', idx === State.currentblockIndex);
-            group.classList.toggle('multi-selected', State.selectedBlockIndices.has(idx));
+            const isSelected = State.selectedBlockIndices.has(idx);
+            group.classList.toggle('multi-selected', isSelected);
+            group.setAttribute('aria-pressed', isSelected ? 'true' : 'false');
         });
     }
 
@@ -361,7 +384,7 @@
                 timeline,
                 'fas fa-layer-group',
                 'No blocks yet',
-                'Use + Add block to create your first sequence.'
+                'Use Add Block to create your first sequence.'
             );
             return;
         }
@@ -378,6 +401,11 @@
             const blockGroup = document.createElement('div');
             blockGroup.className = 'block-group';
             blockGroup.dataset.blockIndex = blockIdx;
+            blockGroup.tabIndex = 0;
+            blockGroup.setAttribute('role', 'button');
+            blockGroup.setAttribute('aria-label', `Select ${block.id || `block ${blockIdx + 1}`}`);
+            blockGroup.setAttribute('aria-pressed', State.selectedBlockIndices.has(blockIdx) ? 'true' : 'false');
+            activateOnKeyboard(blockGroup);
             if (blockIdx === State.currentblockIndex) blockGroup.classList.add('active');
             if (State.selectedBlockIndices.has(blockIdx)) blockGroup.classList.add('multi-selected');
 
@@ -388,14 +416,14 @@
             const flowRisk = hasContinuousFlowRisk(blocks, blockIdx);
             blockLabel.innerHTML = `
             <div class="block-label-content">
-                <span class="block-title-text">${block.id || `block ${blockIdx + 1}`}</span>
+                <span class="block-title-text">${escapeHtml(block.id || `block ${blockIdx + 1}`)}</span>
                 <div class="block-badge-row">
                     <span class="block-badge ${repeatMeta.className}">${repeatMeta.label}</span>
                     ${flowRisk ? '<span class="block-badge is-warning">FLOW RISK</span>' : ''}
                 </div>
             </div>
-            <button class="delete-block-btn" data-block-index="${blockIdx}" title="Remove Block">
-                <i class="fas fa-times"></i>
+            <button class="delete-block-btn" data-block-index="${blockIdx}" title="Remove Block" aria-label="Remove ${escapeHtml(block.id || `block ${blockIdx + 1}`)}">
+                <i class="fas fa-times" aria-hidden="true"></i>
             </button>
         `;
             blockGroup.appendChild(blockLabel);
@@ -413,9 +441,14 @@
             } else {
                 steps.forEach((step, stepIdx) => {
                     const pill = document.createElement('div');
-                    pill.className = `step-pill type-${step.type.toLowerCase()}`;
+                    const safeStepType = ['ON', 'OFF', 'RAMP', 'SINE'].includes(step.type) ? step.type : 'OFF';
+                    pill.className = `step-pill type-${safeStepType.toLowerCase()}`;
                     pill.dataset.blockIndex = blockIdx;
                     pill.dataset.stepIndex = stepIdx;
+                    pill.tabIndex = 0;
+                    pill.setAttribute('role', 'button');
+                    pill.setAttribute('aria-label', `Edit ${safeStepType} step ${stepIdx + 1}`);
+                    activateOnKeyboard(pill);
 
                     let details = '';
                     if (step.type === 'ON') details = `${step.duration_ms}ms @ ${step.int}`;
@@ -428,9 +461,9 @@
                     }
 
                     pill.innerHTML = `
-                    <span>${step.type}</span>
-                    <span style="opacity:0.7; font-size:0.65rem;">${details}</span>
-                    <button class="delete-step" data-block-index="${blockIdx}" data-step-index="${stepIdx}" title="Remove"><i class="fas fa-times"></i></button>
+                    <span>${escapeHtml(safeStepType)}</span>
+                    <span class="step-details">${escapeHtml(details)}</span>
+                    <button class="delete-step" data-block-index="${blockIdx}" data-step-index="${stepIdx}" title="Remove Step" aria-label="Remove step ${stepIdx + 1}"><i class="fas fa-times" aria-hidden="true"></i></button>
                 `;
 
                 pill.addEventListener('click', (e) => {
@@ -638,6 +671,21 @@
     function updateblockSelector() {
         const selector = document.getElementById('block-selector');
         const blockLedLabel = document.getElementById('block-led-label');
+        const refreshAvailability = () => {
+            if (fn.updateEditorAvailability) fn.updateEditorAvailability();
+        };
+        const clearBlockFields = () => {
+            const nameInput = document.getElementById('block-name-input');
+            if (nameInput) nameInput.value = '';
+            document.querySelectorAll('.repeat-mode-btn').forEach(button => {
+                button.classList.remove('is-selected');
+                button.setAttribute('aria-pressed', 'false');
+            });
+            const countField = document.getElementById('repeat-count-field');
+            const durationField = document.getElementById('repeat-duration-field');
+            if (countField) countField.style.display = 'none';
+            if (durationField) durationField.style.display = 'none';
+        };
 
         if (!selector) return;
         selector.innerHTML = '';
@@ -672,6 +720,8 @@
             const opt = document.createElement('option');
             opt.textContent = 'Select LED first';
             selector.appendChild(opt);
+            clearBlockFields();
+            refreshAvailability();
             return;
         }
 
@@ -682,6 +732,8 @@
             const opt = document.createElement('option');
             opt.textContent = 'No blocks';
             selector.appendChild(opt);
+            clearBlockFields();
+            refreshAvailability();
             return;
         }
 
@@ -697,6 +749,7 @@
 
         // Update block config UI
         updateblockConfigUI();
+        refreshAvailability();
     }
 
     function padDurationValue(val) {
@@ -764,6 +817,7 @@
         // Update repeat mode buttons
         document.querySelectorAll('.repeat-mode-btn').forEach(btn => {
             btn.classList.remove('is-selected');
+            btn.setAttribute('aria-pressed', 'false');
         });
 
         let mode = 'once';
@@ -771,7 +825,9 @@
         else if (block.repeat_count) mode = 'count';
         else if (block.repeat_duration_minutes) mode = 'duration';
 
-        document.querySelector(`.repeat-mode-btn[data-mode="${mode}"]`)?.classList.add('is-selected');
+        const selectedModeButton = document.querySelector(`.repeat-mode-btn[data-mode="${mode}"]`);
+        selectedModeButton?.classList.add('is-selected');
+        selectedModeButton?.setAttribute('aria-pressed', 'true');
 
         document.getElementById('repeat-count-field').style.display = mode === 'count' ? 'flex' : 'none';
         document.getElementById('repeat-duration-field').style.display = mode === 'duration' ? 'flex' : 'none';
@@ -825,7 +881,7 @@
 
     function addblock() {
         if (State.selectedLedIndices.size === 0) {
-            alert('Select LEDs first.');
+            showTopToast('Select at least 1 LED first');
             return;
         }
 
@@ -905,4 +961,3 @@
     fn.applyBlockPayloadToLed = applyBlockPayloadToLed;
     fn.clearSelectedBlocks = clearSelectedBlocks;
 })(window);
-

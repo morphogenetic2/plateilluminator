@@ -15,6 +15,14 @@
         return fn.renderTimeline();
     }
 
+    function showTopToast(message) {
+        return fn.showTopToast ? fn.showTopToast(message) : undefined;
+    }
+
+    function markClean() {
+        return fn.markClean ? fn.markClean() : undefined;
+    }
+
     function padDurationValue(val) {
         return `${Math.max(0, parseInt(val, 10) || 0)}`.padStart(2, '0');
     }
@@ -178,7 +186,7 @@ function exportProgram() {
     }
 
     if (!hasAnySteps) {
-        alert('Program is empty.');
+        showTopToast('Add at least 1 step before exporting');
         return;
     }
 
@@ -264,7 +272,8 @@ function performExport(totalSeconds) {
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(a.href);
-    alert('Exported program.json!');
+    markClean();
+    showTopToast('program.json exported');
 }
 
 async function saveToDevice() {
@@ -300,16 +309,18 @@ async function saveToDevice() {
         const writable = await State.fileHandle.createWritable();
         await writable.write(JSON.stringify(exportData, null, 2));
         await writable.close();
+        markClean();
 
         // Visual feedback
         const btn = document.getElementById('save-device-btn');
         const originalText = btn.innerHTML;
-        btn.innerHTML = '<i class="fas fa-check"></i> Saved!';
+        btn.innerHTML = '<i class="fas fa-check" aria-hidden="true"></i> Saved';
         btn.style.color = 'var(--accent-success)';
         setTimeout(() => {
             btn.innerHTML = originalText;
             btn.style.color = '';
         }, 2000);
+        showTopToast('program.json saved to device');
 
     } catch (err) {
         if (err.name !== 'AbortError') {
@@ -396,9 +407,10 @@ function loadProgram(event) {
             renderTimeline();
             updateTotalDurationAvailability();
 
-            alert('Loaded successfully!');
+            markClean();
+            showTopToast('Program loaded');
         } catch (err) {
-            alert('Error loading: ' + err.message);
+            showTopToast(`Could not load program: ${err.message}`);
         }
     };
     reader.readAsText(file);
