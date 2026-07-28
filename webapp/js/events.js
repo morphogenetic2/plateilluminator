@@ -178,6 +178,7 @@ function initEventHandlers() {
 
     // LED actions
     document.getElementById('select-all-btn')?.addEventListener('click', () => {
+        if (App.simulator?.isActive) return;
         for (let i = 0; i < App.config.NUM_LEDS; i++) State.selectedLedIndices.add(i);
         State.currentlyViewedLedIndex = 0;
         updateLedAppearances();
@@ -187,12 +188,20 @@ function initEventHandlers() {
     });
 
     document.getElementById('select-none-btn')?.addEventListener('click', () => {
+        if (App.simulator?.isActive) return;
         State.selectedLedIndices.clear();
+        State.currentlyViewedLedIndex = null;
+        State.currentblockIndex = 0;
+        State.lastClickedLedIndex = null;
+        cancelStepEdit();
         updateLedAppearances();
+        updateblockSelector();
         updateBatchIndicator();
+        renderTimeline();
     });
 
     document.getElementById('clear-selected-btn')?.addEventListener('click', () => {
+        if (App.simulator?.isActive) return;
         if (State.selectedLedIndices.size === 0) {
             showTopToast('Select at least 1 LED first');
             return;
@@ -285,7 +294,6 @@ function initEventHandlers() {
         document.getElementById('file-input').click();
     });
     document.getElementById('file-input')?.addEventListener('change', (e) => {
-        pushHistory(); // Save before load
         loadProgram(e);
     });
     document.getElementById('export-btn')?.addEventListener('click', exportProgram);
@@ -295,6 +303,7 @@ function initEventHandlers() {
     document.getElementById('undo-btn')?.addEventListener('click', undo);
     document.addEventListener('keydown', (e) => {
         if (isEditableTarget(e.target)) return;
+        if (App.simulator?.isActive) return;
 
         // Ctrl+Z: Undo
         if ((e.ctrlKey || e.metaKey) && e.key === 'z') {

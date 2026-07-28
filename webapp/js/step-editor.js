@@ -156,10 +156,11 @@ function updateStep() {
 function buildStepObject() {
     const durationInput = document.getElementById('step-duration');
     const error = document.getElementById('step-error');
-    const duration = parseInt(durationInput.value) || 1000;
+    const parsedDuration = Number(durationInput.value);
+    const duration = Number.isFinite(parsedDuration) ? Math.trunc(parsedDuration) : NaN;
     durationInput.removeAttribute('aria-invalid');
     if (error) error.textContent = '';
-    if (duration < 50) {
+    if (!Number.isFinite(duration) || duration < 50) {
         durationInput.setAttribute('aria-invalid', 'true');
         if (error) error.textContent = 'Duration must be at least 50 ms.';
         durationInput.focus();
@@ -176,7 +177,8 @@ function buildStepObject() {
     } else if (State.currentStepType === 'SINE') {
         step.int0 = Math.min(3000, Math.max(0, parseInt(document.getElementById('sine-int0').value) || 0));
         step.int1 = Math.min(3000, Math.max(0, parseInt(document.getElementById('sine-int1').value) || 0));
-        step.freq = Math.min(20, Math.max(0, parseFloat(document.getElementById('sine-freq').value) || 1));
+        const parsedFrequency = parseFloat(document.getElementById('sine-freq').value);
+        step.freq = Math.min(20, Math.max(0, Number.isFinite(parsedFrequency) ? parsedFrequency : 1));
     }
     return step;
 }

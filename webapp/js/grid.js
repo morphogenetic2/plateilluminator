@@ -17,6 +17,10 @@
         return fn.renderTimeline();
     }
 
+    function cancelStepEdit() {
+        return fn.cancelStepEdit ? fn.cancelStepEdit() : undefined;
+    }
+
 function ensureDragSelectBox() {
     if (DragSelect.boxEl) return;
     const container = document.querySelector('.led-grid-container');
@@ -203,6 +207,7 @@ function handleLedGridKeydown(event) {
 
 function handleLedClick(ledIndex, event) {
     if (DragSelect.ignoreClick) return;
+    if (App.simulator?.isActive) return;
     const isCtrl = event.ctrlKey || event.metaKey;
     const isShift = event.shiftKey;
 
@@ -232,11 +237,17 @@ function handleLedClick(ledIndex, event) {
         }
     }
 
-    // Update last clicked for Shift+click functionality
-    State.lastClickedLedIndex = ledIndex;
-
-    State.currentlyViewedLedIndex = ledIndex;
-    State.currentblockIndex = 0;
+    if (State.selectedLedIndices.size === 0) {
+        State.lastClickedLedIndex = null;
+        State.currentlyViewedLedIndex = null;
+        State.currentblockIndex = 0;
+        cancelStepEdit();
+    } else {
+        // Update last clicked for Shift+click functionality
+        State.lastClickedLedIndex = ledIndex;
+        State.currentlyViewedLedIndex = ledIndex;
+        State.currentblockIndex = 0;
+    }
 
     Runtime.allLedButtons.forEach((button, index) => {
         button.tabIndex = index === ledIndex ? 0 : -1;

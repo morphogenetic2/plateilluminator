@@ -23,6 +23,135 @@
         return fn.markClean ? fn.markClean() : undefined;
     }
 
+    function pushHistory() {
+        return fn.pushHistory ? fn.pushHistory() : undefined;
+    }
+
+    const STEP_TYPES = new Set(['ON', 'OFF', 'RAMP', 'SINE']);
+
+    function finiteNumber(value, fallback = null) {
+        if (value === null || value === undefined || value === '') return fallback;
+        const number = Number(value);
+        return Number.isFinite(number) ? number : fallback;
+    }
+
+    function clamp(value, min, max) {
+        return Math.min(max, Math.max(min, value));
+    }
+
+    function normalizeStep(rawStep, context) {
+        if (!rawStep || typeof rawStep !== 'object' || Array.isArray(rawStep)) {
+            throw new Error(`${context} must be an object`);
+        }
+
+        const type = String(rawStep.type ?? rawStep.action ?? '').toUpperCase();
+        if (!STEP_TYPES.has(type)) {
+            throw new Error(`${context} has an unsupported step type`);
+        }
+
+        let durationMs = null;
+        if (rawStep.duration_ms !== undefined) {
+            durationMs = finiteNumber(rawStep.duration_ms);
+        } else if (rawStep.duration_s !== undefined) {
+            const durationSeconds = finiteNumber(rawStep.duration_s);
+            durationMs = durationSeconds === null ? null : durationSeconds * 1000;
+        }
+        if (!Number.isFinite(durationMs) || durationMs < 0) {
+            throw new Error(`${context} has an invalid duration`);
+        }
+
+        const step = { type, duration_ms: durationMs };
+        if (type === 'ON') {
+            step.int = clamp(finiteNumber(rawStep.int ?? rawStep.intensity_uwcm2, 0), 0, 3000);
+        } else if (type === 'RAMP') {
+            step.int0 = clamp(finiteNumber(rawStep.int0 ?? rawStep.start_intensity_uwcm2, 0), 0, 3000);
+            step.int1 = clamp(finiteNumber(rawStep.int1 ?? rawStep.end_intensity_uwcm2, 0), 0, 3000);
+        } else if (type === 'SINE') {
+            step.int0 = clamp(finiteNumber(rawStep.int0 ?? rawStep.min_intensity_uwcm2, 0), 0, 3000);
+            step.int1 = clamp(finiteNumber(rawStep.int1 ?? rawStep.max_intensity_uwcm2, 0), 0, 3000);
+            step.freq = clamp(finiteNumber(rawStep.freq ?? rawStep.frequency_hz, 1), 0, 20);
+        }
+        return step;
+    }
+
+    function normalizeBlock(rawBlock, blockIndex, ledKey) {
+        if (!rawBlock || typeof rawBlock !== 'object' || Array.isArray(rawBlock)) {
+            throw new Error(`${ledKey} block ${blockIndex + 1} must be an object`);
+        }
+        if (!Array.isArray(rawBlock.steps)) {
+            throw new Error(`${ledKey} block ${blockIndex + 1} steps must be an array`);
+        }
+
+        const repeatDurationMinutes = rawBlock.repeat_duration_s !== undefined
+            ? finiteNumber(rawBlock.repeat_duration_s) / 60
+            : finiteNumber(rawBlock.repeat_duration_minutes);
+        const repeatCount = finiteNumber(rawBlock.repeat_count);
+
+        return {
+            id: String(rawBlock.id ?? `block${blockIndex}`),
+            steps: rawBlock.steps.map((step, stepIndex) =>
+                normalizeStep(step, `${ledKey} block ${blockIndex + 1} step ${stepIndex + 1}`)
+            ),
+            repeat_duration_minutes: repeatDurationMinutes > 0 ? repeatDurationMinutes : null,
+            repeat_count: repeatCount > 0 ? Math.floor(repeatCount) : null,
+            repeat_continuous: Boolean(rawBlock.repeat_continuous),
+        };
+    }
+
+    function normalizeLoadedProgram(loaded) {
+        if (!loaded || typeof loaded !== 'object' || Array.isArray(loaded)) {
+            throw new Error('Program must be a JSON object');
+        }
+
+        const programData = {};
+        for (let i = 0; i < App.config.NUM_LEDS; i++) {
+            programData[`LED${i}`] = { blocks: [] };
+        }
+
+        for (const [ledKey, ledData] of Object.entries(loaded)) {
+            const match = /^LED(\d+)$/.exec(ledKey);
+            if (!match) continue;
+            const ledIndex = parseInt(match[1], 10);
+            if (ledIndex < 0 || ledIndex >= App.config.NUM_LEDS) continue;
+
+            if (Array.isArray(ledData)) {
+                programData[ledKey] = {
+                    blocks: ledData.length === 0 ? [] : [{
+                        id: 'block0',
+                        steps: ledData.map((step, stepIndex) =>
+                            normalizeStep(step, `${ledKey} step ${stepIndex + 1}`)
+                        ),
+                        repeat_duration_minutes: null,
+                        repeat_count: null,
+                        repeat_continuous: false,
+                    }],
+                };
+                continue;
+            }
+
+            if (!ledData || typeof ledData !== 'object' || !Array.isArray(ledData.blocks)) {
+                throw new Error(`${ledKey} blocks must be an array`);
+            }
+            programData[ledKey] = {
+                blocks: ledData.blocks.map((block, blockIndex) =>
+                    normalizeBlock(block, blockIndex, ledKey)
+                ),
+            };
+        }
+
+        const rawTotalSeconds = loaded.total_duration_s !== undefined
+            ? finiteNumber(loaded.total_duration_s)
+            : finiteNumber(loaded.total_duration_minutes, 0) * 60;
+        if (!Number.isFinite(rawTotalSeconds) || rawTotalSeconds < 0) {
+            throw new Error('Total duration must be a non-negative number');
+        }
+
+        return {
+            programData,
+            totalSeconds: rawTotalSeconds,
+        };
+    }
+
     function padDurationValue(val) {
         return `${Math.max(0, parseInt(val, 10) || 0)}`.padStart(2, '0');
     }
@@ -176,32 +305,29 @@ function findLongestProgramDuration() {
     return maxDurationS;
 }
 
-function exportProgram() {
-    let hasAnySteps = false;
-    for (const ledKey in State.programData) {
-        if (State.programData[ledKey].blocks?.length > 0) {
-            hasAnySteps = true;
-            break;
-        }
-    }
+function hasAnyProgramSteps() {
+    return Object.values(State.programData).some(ledData =>
+        ledData?.blocks?.some(block => Array.isArray(block.steps) && block.steps.length > 0)
+    );
+}
 
-    if (!hasAnySteps) {
+function resolveExportTotalSeconds() {
+    if (!hasAnyProgramSteps()) {
         showTopToast('Add at least 1 step before exporting');
-        return;
+        return null;
     }
 
     const totalSeconds = syncRunTimePickerFromFields();
     const h = parseInt(document.getElementById('run-time-hours').value, 10) || 0;
     const m = parseInt(document.getElementById('run-time-minutes').value, 10) || 0;
     const s = parseInt(document.getElementById('run-time-seconds').value, 10) || 0;
-
-    // Validation: Check if longest program exceeds total duration
     const longestProgramSeconds = findLongestProgramDuration();
 
     if (totalSeconds > 0 && longestProgramSeconds > totalSeconds) {
-        const longestHours = Math.floor(longestProgramSeconds / 3600);
-        const longestMins = Math.floor((longestProgramSeconds % 3600) / 60);
-        const longestSecs = Math.round(longestProgramSeconds % 60);
+        const adjustedTotalS = Math.ceil(longestProgramSeconds);
+        const longestHours = Math.floor(adjustedTotalS / 3600);
+        const longestMins = Math.floor((adjustedTotalS % 3600) / 60);
+        const longestSecs = adjustedTotalS % 60;
 
         const userChoice = confirm(
             `⚠️ Duration Mismatch!\n\n` +
@@ -211,19 +337,20 @@ function exportProgram() {
         );
 
         if (userChoice) {
-            // Auto-adjust
             document.getElementById('run-time-hours').value = longestHours;
             document.getElementById('run-time-minutes').value = longestMins;
             document.getElementById('run-time-seconds').value = longestSecs;
             syncRunTimePickerFromFields();
-
-            // Recalculate with new values
-            const adjustedTotalS = (longestHours * 3600) + (longestMins * 60) + longestSecs;
-            performExport(adjustedTotalS);
-            return;
+            return adjustedTotalS;
         }
     }
 
+    return totalSeconds;
+}
+
+function exportProgram() {
+    const totalSeconds = resolveExportTotalSeconds();
+    if (totalSeconds === null) return;
     performExport(totalSeconds);
 }
 
@@ -277,12 +404,13 @@ function performExport(totalSeconds) {
 }
 
 async function saveToDevice() {
+    const totalSeconds = resolveExportTotalSeconds();
+    if (totalSeconds === null) return;
+
     if (!('showSaveFilePicker' in window)) {
         alert('Your browser does not support direct saving. Please use standard Export.');
         return;
     }
-
-    const totalSeconds = syncRunTimePickerFromFields();
 
     const exportData = getExportData(totalSeconds);
 
@@ -339,61 +467,10 @@ function loadProgram(event) {
     reader.onload = (e) => {
         try {
             const loaded = JSON.parse(e.target.result);
-
-            // Unified total duration in seconds
-            let totalSeconds = 0;
-            if (loaded.total_duration_s !== undefined) {
-                totalSeconds = loaded.total_duration_s;
-            } else if (loaded.total_duration_minutes !== undefined) {
-                totalSeconds = loaded.total_duration_minutes * 60;
-            }
-
-            // Clean State
-            State.programData = {};
-            for (const ledKey in loaded) {
-                if (!ledKey.startsWith('LED')) continue;
-                const ledData = loaded[ledKey];
-
-                if (Array.isArray(ledData)) {
-                    // Legacy format
-                    State.programData[ledKey] = {
-                        blocks: [{
-                            id: 'block0',
-                            steps: ledData.map(step => {
-                                // Map old field names to internal state
-                                if (step.duration_s !== undefined) step.duration_ms = step.duration_s * 1000;
-                                return step;
-                            }),
-                            repeat_duration_minutes: null,
-                            repeat_count: null
-                        }]
-                    };
-                } else if (ledData?.blocks) {
-                    ledData.blocks.forEach(block => {
-                        // Map old field names to internal UI state
-                        if (block.repeat_duration_s !== undefined) {
-                            block.repeat_duration_minutes = block.repeat_duration_s / 60;
-                        }
-                        if (block.steps) {
-                            block.steps.forEach(step => {
-                                if (step.duration_s !== undefined) {
-                                    step.duration_ms = step.duration_s * 1000;
-                                }
-                            });
-                        }
-                    });
-                    State.programData[ledKey] = ledData;
-                } else {
-                    State.programData[ledKey] = { blocks: [] };
-                }
-            }
-
-            // Ensure all LEDs exist
-            for (let i = 0; i < App.config.NUM_LEDS; i++) {
-                if (!State.programData[`LED${i}`]) {
-                    State.programData[`LED${i}`] = { blocks: [] };
-                }
-            }
+            const normalized = normalizeLoadedProgram(loaded);
+            pushHistory();
+            State.programData = normalized.programData;
+            const totalSeconds = normalized.totalSeconds;
 
             // Update duration inputs
             document.getElementById('run-time-hours').value = Math.floor(totalSeconds / 3600);
@@ -413,6 +490,9 @@ function loadProgram(event) {
             showTopToast(`Could not load program: ${err.message}`);
         }
     };
+    reader.onerror = () => {
+        showTopToast('Could not read the selected program file');
+    };
     reader.readAsText(file);
     event.target.value = '';
 }
@@ -426,4 +506,5 @@ function loadProgram(event) {
     fn.loadProgram = loadProgram;
     fn.syncRunTimePickerFromFields = syncRunTimePickerFromFields;
     fn.updateTotalDurationAvailability = updateTotalDurationAvailability;
+    fn.normalizeLoadedProgram = normalizeLoadedProgram;
 })(window);

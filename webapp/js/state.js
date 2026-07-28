@@ -55,6 +55,7 @@
         suppressTimelineClicks: false,
         modalTrigger: null,
         draftSaveTimer: null,
+        sortableWarningShown: false,
     });
 
     const State = App.state;
@@ -85,6 +86,8 @@
     }
 
     function saveDraft() {
+        App.runtime.draftSaveTimer = null;
+        if (!State.isDirty) return;
         try {
             const hours = parseInt(document.getElementById('run-time-hours')?.value, 10) || 0;
             const minutes = parseInt(document.getElementById('run-time-minutes')?.value, 10) || 0;
@@ -107,6 +110,10 @@
 
     function markClean() {
         State.isDirty = false;
+        if (App.runtime.draftSaveTimer) {
+            clearTimeout(App.runtime.draftSaveTimer);
+            App.runtime.draftSaveTimer = null;
+        }
         try {
             localStorage.removeItem(App.config.DRAFT_STORAGE_KEY);
         } catch (error) {
@@ -147,7 +154,10 @@
     }
 
     function updateEditorAvailability() {
-        const hasSelection = State.selectedLedIndices.size > 0 && State.currentlyViewedLedIndex !== null;
+        const simulatorActive = Boolean(App.simulator?.isActive);
+        const hasSelection = !simulatorActive &&
+            State.selectedLedIndices.size > 0 &&
+            State.currentlyViewedLedIndex !== null;
         const viewedBlocks = hasSelection
             ? (State.programData[`LED${State.currentlyViewedLedIndex}`]?.blocks || [])
             : [];
@@ -165,13 +175,30 @@
         const addBlockButton = document.getElementById('add-block-btn');
         if (addBlockButton) addBlockButton.disabled = !hasSelection;
 
+        document.querySelectorAll('.led-actions button').forEach(control => {
+            control.disabled = simulatorActive;
+        });
+
+        ['load-btn', 'view-all-btn'].forEach(id => {
+            const control = document.getElementById(id);
+            if (control) control.disabled = simulatorActive;
+        });
+
+        const undoButton = document.getElementById('undo-btn');
+        if (undoButton) {
+            undoButton.disabled = simulatorActive || State.history.length === 0;
+            undoButton.style.opacity = undoButton.disabled ? 0.5 : 1;
+        }
+
         document.querySelectorAll('#block-selector, #remove-block-btn, #block-name-input, .repeat-mode-btn, #repeat-count-input, #repeat-duration-trigger').forEach(control => {
             control.disabled = !hasBlock;
         });
 
         if (guidance) {
             guidance.classList.toggle('is-ready', hasSelection);
-            if (!hasSelection) {
+            if (simulatorActive) {
+                guidance.textContent = 'Stop the simulation to edit the program.';
+            } else if (!hasSelection) {
                 guidance.textContent = 'Select an LED to enable the step editor.';
             } else if (!hasBlock) {
                 guidance.textContent = 'Add a block, or add a step to create the first block automatically.';

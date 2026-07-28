@@ -555,10 +555,19 @@
             });
         });
 
+        const SortableApi = global.Sortable;
+        if (!SortableApi?.create) {
+            if (!Runtime.sortableWarningShown) {
+                Runtime.sortableWarningShown = true;
+                showTopToast('Drag reordering is unavailable offline');
+            }
+            return;
+        }
+
         // Sortable for STEPS in all blocks of the current LED (supports cross-block moves)
     Runtime.timelineSortableInstances = [];
     timeline.querySelectorAll('.block-steps').forEach(container => {
-        const sortable = Sortable.create(container, {
+        const sortable = SortableApi.create(container, {
             animation: 150,
             group: 'timeline-steps',
             draggable: '.step-pill',
@@ -612,9 +621,9 @@
             Runtime.timelineSortableInstances.push(sortable);
         });
 
-        // Sortable for BLOCKS (NEW)
+    // Sortable for BLOCKS (NEW)
     if (blocks.length > 1) {
-        Runtime.blockSortableInstance = Sortable.create(timeline, {
+        Runtime.blockSortableInstance = SortableApi.create(timeline, {
             animation: 150,
             draggable: '.block-group',
             handle: '.block-label', // Drag by header only
